@@ -1,19 +1,28 @@
+"""
+Serbian Medical Card TLV format parsing - extracting specific data chunks from Serbian Medical Card data
+
+Functions:
+    parse_medical_document(data: bytes, doc: MedicalDocument) - Parse Serbian Medical Card document data
+    parse_medical_fixed_personal(data: bytes, doc: MedicalDocument) - Parse Serbian Medical Card fixed personal data
+    parse_medical_variable_personal(data: bytes, doc: MedicalDocument) - Parse Serbian Medical Card variable personal data
+    parse_medical_variable_admin(data: bytes, doc: MedicalDocument) - Parse Serbian Medical Card variable administrative data
+"""
 from core.tlv import parse_tlv
-from core.encoding import decode_utf16le_date, decode_ascii_date
-
-
-def _decode_utf16le(value: bytes) -> str:
-    if not value:
-        return ""
-    try:
-        return value.decode("utf-16le").strip("\x00")
-    except Exception:
-        return ""
+from core.encoding import decode_utf16le_date, decode_ascii_date, _decode_utf16le
 
 
 # ---------------- DOCUMENT ----------------
 
 def parse_medical_document(data: bytes, doc):
+    """
+    Parse Serbian Medical Card document data.
+
+    Parameters:
+        data (bytes): Document data
+        doc (MedicalDocument): Document object
+    Returns:
+        None
+    """
     fields = parse_tlv(data)
 
     doc.insurer_name = _decode_utf16le(fields.get(1553, b""))
@@ -29,6 +38,15 @@ def parse_medical_document(data: bytes, doc):
 # ---------------- FIXED PERSONAL ----------------
 
 def parse_medical_fixed_personal(data: bytes, doc):
+    """
+    Parse Serbian Medical Card fixed personal data.
+
+    Parameters:
+        data (bytes): Fixed personal data
+        doc (MedicalDocument): Document object
+    Returns:
+        None
+    """
     fields = parse_tlv(data)
 
     doc.last_name = _decode_utf16le(fields.get(1570, b""))
@@ -44,6 +62,15 @@ def parse_medical_fixed_personal(data: bytes, doc):
 # ---------------- VARIABLE PERSONAL ----------------
 
 def parse_medical_variable_personal(data: bytes, doc):
+    """
+    Parse Serbian Medical Card variable personal data.
+
+    Parameters:
+        data (bytes): Variable personal data
+        doc (MedicalDocument): Document object
+    Returns:
+        None
+    """
     fields = parse_tlv(data)
 
     doc.valid_until = decode_utf16le_date(fields.get(1586, b""))
@@ -53,6 +80,15 @@ def parse_medical_variable_personal(data: bytes, doc):
 # ---------------- VARIABLE ADMIN ----------------
 
 def parse_medical_variable_admin(data: bytes, doc):
+    """
+    Parse Serbian Medical Card variable administrative data.
+
+    Parameters:
+        data (bytes): Variable administrative data
+        doc (MedicalDocument): Document object
+    Returns:
+        None
+    """
     fields = parse_tlv(data)
 
     doc.parent_name = _decode_utf16le(fields.get(1601, b""))

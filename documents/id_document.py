@@ -1,3 +1,11 @@
+"""
+Serbian ID document class definition
+
+Class: IdDocument
+Class methods:
+    full_name() - Get full name of the person (name + parent name + surname)
+    address() - Get address of the person (street + house number + house letter + place + community)
+"""
 from dataclasses import dataclass
 from typing import Optional
 from PIL import Image
@@ -47,9 +55,25 @@ class IdDocument:
     portrait: Optional[Image.Image] = None
 
     def full_name(self) -> str:
+        """
+        Get full name of the person (name + parent name + surname).
+
+        Parameters:
+            None
+        Returns:
+            str: Full name
+        """
         return " ".join(p for p in [self.given_name, self.parent_given_name, self.surname] if p)
 
     def address(self) -> str:
+        """
+        Get address of the person (street + house number + house letter + place + community).
+
+        Parameters:
+            None
+        Returns:
+            str: Address
+        """
         parts = [
             self.street,
             self.house_number + self.house_letter,

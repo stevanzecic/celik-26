@@ -1,3 +1,7 @@
+"""
+Serbian Medical Card document class definition
+"""
+
 class MedicalDocument:
     def __init__(self):
         self.insurance_number = ""

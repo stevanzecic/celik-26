@@ -1,3 +1,12 @@
+"""
+Serbian ID TLV format parsing - extracting specific data chunks from Serbian ID card data
+
+Functions:
+    parse_id_document(data: bytes, doc: IdDocument) - Parse Serbian ID document data
+    parse_id_personal(data: bytes, doc: IdDocument) - Parse Serbian ID personal data
+    parse_id_residence(data: bytes, doc: IdDocument) - Parse Serbian ID residence data
+    parse_id_portrait(data: bytes) - Parse Serbian ID portrait data
+"""
 from PIL import Image
 import io
 
@@ -7,6 +16,15 @@ from core.encoding import s, format_date_ddmmyyyy
 
 
 def parse_id_document(data: bytes, doc):
+    """
+    Parse Serbian ID document data.
+
+    Parameters:
+        data (bytes): Document data
+        doc (IdDocument): Document object
+    Returns:
+        None
+    """
     f = parse_tlv(data)
 
     doc.doc_reg_no = s(f.get(1546, b""))
@@ -20,6 +38,15 @@ def parse_id_document(data: bytes, doc):
 
 
 def parse_id_personal(data: bytes, doc):
+    """
+    Parse Serbian ID personal data.
+
+    Parameters:
+        data (bytes): Personal data
+        doc (IdDocument): Document object
+    Returns:
+        None
+    """
     f = parse_tlv(data)
 
     doc.personal_number = s(f.get(1558, b""))
@@ -38,6 +65,15 @@ def parse_id_personal(data: bytes, doc):
 
 
 def parse_id_residence(data: bytes, doc):
+    """
+    Parse Serbian ID residence data.
+
+    Parameters:
+        data (bytes): Residence data
+        doc (IdDocument): Document object
+    Returns:
+        None
+    """
     f = parse_tlv(data)
 
     doc.state = s(f.get(1568, b""))
@@ -52,10 +88,15 @@ def parse_id_residence(data: bytes, doc):
     doc.address_date = format_date_ddmmyyyy(s(f.get(1580, b"")))
     doc.address_label = s(f.get(1581, b""))
 
-from PIL import Image
-import io
-
 def parse_id_portrait(data: bytes):
+    """
+    Parse Serbian ID portrait data.
+
+    Parameters:
+        data (bytes): Portrait data
+    Returns:
+        Image.Image | None: Portrait image or None if failed
+    """
     if not data or len(data) <= 4:
         return None
 

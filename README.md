@@ -4,7 +4,7 @@
   <img src="./assets/img/celik-26-logo-nbg.png" width="45%" alt="celik-26-logo">
 </p>
 
-`v0.1.0`
+`v0.1.1`
 
 </div>
 
@@ -25,6 +25,7 @@
 - [RUNNING CELIK-26](#running-celik-26)
   - [From source](#from-source)
 - [CHANGELOG](#changelog)
+  - [v0.1.1](#v011)
   - [v0.1.0](#v010)
 - [LICENSE](#license)
 
@@ -210,6 +211,11 @@ To run the project from source, follow these steps:
 ---
 
 ## CHANGELOG
+
+### v0.1.1
+
+- Minor refactoring
+- Added docstrings to all classes and functions for better documentation
 
 ### v0.1.0
 

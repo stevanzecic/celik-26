@@ -1,3 +1,15 @@
+"""
+Serbian ID / Medical / Vehicle TLV format parsing
+
+Functions:
+    parse_tlv(data: bytes) - Parse TLV data
+    assign_field(fields: dict, tag: int, obj, attr: str) - Assign field value to the object
+    assign_bool_field(fields: dict, tag: int, obj, attr: str) - Assign boolean field value to the object
+"""
+
+# ------------------------------------------------------------------
+# Parsing
+# ------------------------------------------------------------------
 def parse_tlv(data: bytes) -> dict[int, bytes]:
     """
     Serbian ID / Medical / Vehicle TLV format:
@@ -5,6 +17,11 @@ def parse_tlv(data: bytes) -> dict[int, bytes]:
     TAG    : uint16 (little endian)
     LENGTH : uint16 (little endian)
     VALUE  : LENGTH bytes
+
+    Parameters:
+        data (bytes): TLV data
+    Returns:
+        dict[int, bytes]: Parsed TLV data
     """
     pos = 0
     n = len(data)
@@ -27,10 +44,21 @@ def parse_tlv(data: bytes) -> dict[int, bytes]:
 
 
 # ------------------------------------------------------------------
-# Helpers equivalent to tlv.AssignField / AssignBoolField in Go
+# Helpers
 # ------------------------------------------------------------------
 
 def assign_field(fields: dict, tag: int, obj, attr: str):
+    """
+    Assign field value to the object.
+
+    Parameters:
+        fields (dict): TLV data
+        tag (int): Tag
+        obj (object): Object to assign value to
+        attr (str): Attribute name
+    Returns:
+        None
+    """
     value = fields.get(tag)
     if value is None:
         return
@@ -45,6 +73,17 @@ def assign_field(fields: dict, tag: int, obj, attr: str):
 
 
 def assign_bool_field(fields: dict, tag: int, obj, attr: str):
+    """
+    Assign boolean field value to the object.
+
+    Parameters:
+        fields (dict): TLV data
+        tag (int): Tag
+        obj (object): Object to assign value to
+        attr (str): Attribute name
+    Returns:
+        None
+    """
     value = fields.get(tag)
 
     if not value:

@@ -1,3 +1,11 @@
+"""
+APDU (Application Protocol Data Unit) helpers - communication messages format
+
+Functions:
+    build_apdu(cla, ins, p1, p2, data, le) - Build APDU
+    read_binary(pcsc, offset, length) - Read binary data from the card
+"""
+
 def build_apdu(
     cla: int,
     ins: int,
@@ -6,6 +14,19 @@ def build_apdu(
     data: bytes = b"",
     le: int | None = None,
 ) -> list[int]:
+    """
+    Build APDU (ISO 7816-4)
+
+    Parameters:
+        cla (int): CLA byte
+        ins (int): INS byte
+        p1 (int): P1 byte
+        p2 (int): P2 byte
+        data (bytes): Data bytes
+        le (int | None): Expected response length
+    Returns:
+        list[int]: APDU bytes
+    """
     apdu = [cla, ins, p1, p2]
 
     if data:
@@ -20,8 +41,13 @@ def build_apdu(
 def read_binary(pcsc, offset: int, length: int) -> bytes:
     """
     READ BINARY (ISO 7816-4)
-    offset: 0–65535
-    length: max 0xFF per APDU
+
+    Parameters:
+        pcsc (PcscCard): Card connection
+        offset (int): Offset (0-65535)
+        length (int): Length (max 0xFF per APDU)
+    Returns:
+        bytes: Binary data
     """
     p1 = (offset >> 8) & 0xFF
     p2 = offset & 0xFF
