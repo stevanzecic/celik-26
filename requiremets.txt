@@ -2,3 +2,4 @@ pyscard
 Pillow
 PyQt6
 qt-material
+requests

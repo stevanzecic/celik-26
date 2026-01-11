@@ -75,6 +75,7 @@ class ReaderWorker(QThread):
         self.current_reader_name = None
         self.card_connected = False
         self.card_read = False
+        self.reader_connected_once = False
 
     def run(self):
         while self._running:
@@ -84,7 +85,6 @@ class ReaderWorker(QThread):
             if not readers:
                 if self.reader_connected_once:
                     self._reset_all_state()
-                    self.reader_connected_once = False
                     self.reader_disconnected.emit()
 
                 time.sleep(self.poll_interval)
@@ -116,10 +116,9 @@ class ReaderWorker(QThread):
 
             # ---------- READ CARD (ONCE) ----------
             if self.card_connected and not self.is_card_present():
-                self.card_connected = False
-                self.card_read = False
-                self.current_reader = None
+                self._reset_all_state()
                 self.no_card_present.emit()
+                time.sleep(self.poll_interval)
                 continue
             if self.card_connected and not self.card_read:
                 try:
