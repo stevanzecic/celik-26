@@ -1,3 +1,8 @@
+"""
+CELIK-26 GUI worker thread for reader management.
+Handles reader connection, card detection and reading.
+"""
+
 from PyQt6.QtCore import QThread, pyqtSignal
 import time
 

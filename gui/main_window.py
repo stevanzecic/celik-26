@@ -1,9 +1,16 @@
+"""
+CELIK-26 GUI main window.
+"""
+
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout,
+    QMainWindow, QWidget, QApplication,
+    QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QMessageBox,
     QMenu, QStatusBar
 )
 from PyQt6.QtCore import Qt, QTimer
+
+from qt_material import apply_stylesheet
 
 from gui.workers.reader_worker import ReaderWorker
 from gui.settings.settings_window import SettingsWindow
@@ -34,11 +41,12 @@ class MainWindow(QMainWindow):
         self.info_label.setStyleSheet("font-size: 16px;")
         layout.addWidget(self.info_label)
 
+        self.button_layout = QHBoxLayout()
+
         self.read_btn = QPushButton("Read Card")
         self.read_btn.setEnabled(False)
         self.read_btn.setToolTip("No reader connected")
         self.read_btn.clicked.connect(self.manual_read)
-        layout.addWidget(self.read_btn, alignment=Qt.AlignmentFlag.AlignRight)
 
         self.save_btn = QPushButton("Save")
         self.save_btn.setEnabled(False)
@@ -46,8 +54,13 @@ class MainWindow(QMainWindow):
         self.print_btn = QPushButton("Print")
         self.print_btn.setEnabled(False)
 
-        layout.addWidget(self.save_btn, alignment=Qt.AlignmentFlag.AlignRight)
-        layout.addWidget(self.print_btn, alignment=Qt.AlignmentFlag.AlignRight)
+        self.button_layout.addStretch(1)
+
+        self.button_layout.addWidget(self.save_btn)
+        self.button_layout.addWidget(self.print_btn)
+        self.button_layout.addWidget(self.read_btn)
+
+        layout.addLayout(self.button_layout)
 
         self.setCentralWidget(central)
 
@@ -67,7 +80,7 @@ class MainWindow(QMainWindow):
         self.reader_icon.setToolTip("No reader connected")
         self.status.addPermanentWidget(self.reader_icon)
 
-        # -------- Blink timer (MUST COME BEFORE set_reader_status) --------
+        # -------- Blink timer --------
         self._blink_timer = QTimer(self)
         self._blink_timer.setInterval(500)
         self._blink_timer.timeout.connect(self._toggle_blink)
@@ -83,8 +96,6 @@ class MainWindow(QMainWindow):
         self.reader_menu = QMenu("Reader Selection", self)
         self.refresh_action = self.reader_menu.addAction("Refresh")
         self.refresh_action.triggered.connect(self.refresh_readers)
-
-        # self.reader_menu.addSeparator()
 
         self.auto_action = self.reader_menu.addAction("Auto Select")
         self.auto_action.setCheckable(True)
@@ -112,8 +123,8 @@ class MainWindow(QMainWindow):
     def refresh_readers(self):
         readers = get_readers_list(override_exception=True)
 
-        # Remove old reader actions (keep first 3 items)
-        for act in self.reader_menu.actions()[3:]:
+        # Remove old reader actions (keep first 2 items - "Refresh" and "Auto")
+        for act in self.reader_menu.actions()[2:]:
             self.reader_menu.removeAction(act)
 
         if readers:
@@ -149,6 +160,7 @@ class MainWindow(QMainWindow):
 
     def open_settings(self):
         dlg = SettingsWindow(self)
+        dlg.theme_changed.connect(self.apply_theme)
         dlg.exec()
 
     # ---------- Reader status and icon ----------
@@ -280,3 +292,26 @@ class MainWindow(QMainWindow):
 
         self.status.showMessage("Manual read triggered...")
         self.worker.force_read()
+
+    # ---------- Theme management ----------
+
+    def apply_theme(self, theme_name: str):
+        """
+        Apply qt-material theme at runtime.
+
+        Parameters:
+            theme_name (str): Theme name
+        """
+        app = QApplication.instance()
+
+        if theme_name == "dark":
+            apply_stylesheet(app, theme="dark_teal.xml")
+
+        elif theme_name == "light":
+            apply_stylesheet(app, theme="light_blue.xml")
+
+        elif theme_name == "auto":
+            # Simple auto logic: default to dark
+            apply_stylesheet(app, theme="dark_teal.xml")
+
+        self.status.showMessage(f"Theme changed to {theme_name}")
