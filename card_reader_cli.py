@@ -8,7 +8,7 @@ CLI:
     python3 card_reader_cli.py -r <READER_NAME> - Read card from specific reader
 Functions:
     connect_first_reader() - Connect to the first available reader
-    get_readers_list() - Fetch list of connected readers
+    get_readers_list(override_exception: bool = False) - Fetch list of connected readers
     connect_reader(reader_name) - Connect to a specific reader given by name
     read_card(card_reader) - Read card in the given reader
     auto_read_card() - Detect card and read data from first available reader
@@ -30,14 +30,16 @@ def connect_first_reader():
     card_reader = connect_first_card()
     return card_reader
 
-def get_readers_list():
+def get_readers_list(override_exception: bool = False):
     """
     Fetch list of connected readers.
 
+    Parameters:
+        override_exception (bool): Override exception - prevents raising RuntimeError
     Returns:
         list[PcscCard]: List of connected card readers
     """
-    reader_list = fetch_readers_list()
+    reader_list = fetch_readers_list(override_exception=override_exception)
     return reader_list
 
 def connect_reader(reader_name):

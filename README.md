@@ -205,6 +205,8 @@ To run the project from source, follow these steps:
     | --- | --- |
     | pyscard | >=2.3.1 |
     | Pillow | >=12.0.0 |
+    | PyQt6 | >=6.10.1 |
+    | qt-material | >=2.17 |
 
 [🔝 Back to top](#top)
 

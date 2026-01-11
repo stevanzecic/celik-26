@@ -7,7 +7,7 @@ Class methods:
     atr() - Get ATR value of the card
 Functions:
     connect_first_card() - Connect to the first available reader
-    fetch_readers_list() - Fetch list of connected readers
+    fetch_readers_list(override_exception: bool = False) - Fetch list of connected readers
     connect_card(reader_name: str) - Connect to a specific reader given by name
 """
 from smartcard.System import readers
@@ -66,18 +66,22 @@ def connect_first_card() -> PcscCard:
 
     return PcscCard(conn)
 
-def fetch_readers_list() -> list[str]:
+def fetch_readers_list(override_exception: bool = False) -> list[str]:
     """
     Fetch list of connected readers.
 
     Parameters:
-        None
+        override_exception (bool): Override exception - prevents raising RuntimeError
     Returns:
         list[str]: List of reader names
     """
     r = readers()
     if not r:
-        raise RuntimeError("No smart card readers found")
+        if not override_exception:
+            raise RuntimeError("No smart card readers found")
+        else:
+            print("No smart card readers found")
+            return []
 
     return [r[i].name for i in range(len(r))]
 
