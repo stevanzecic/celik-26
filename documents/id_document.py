@@ -67,20 +67,26 @@ class IdDocument:
 
     def address(self) -> str:
         """
-        Get address of the person (street + house number + house letter + place + community).
+        Format the residence address in the same order as the official reader.
 
         Parameters:
             None
         Returns:
             str: Address
         """
-        parts = [
-            self.street,
-            self.house_number + self.house_letter,
-            self.place,
-            self.community,
+        street = " ".join(
+            value for value in (self.street, self.house_number + self.house_letter) if value
+        )
+        details = [
+            f"ulaz {self.entrance}" if self.entrance else "",
+            f"sprat {self.floor}" if self.floor else "",
+            f"stan {self.apartment_number}" if self.apartment_number else "",
         ]
-        return ", ".join(p for p in parts if p)
+        return ", ".join(
+            value
+            for value in (self.place, self.community, street, *details)
+            if value
+        )
 
     # def __repr__(self):
     #     return (

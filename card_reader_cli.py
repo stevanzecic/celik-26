@@ -15,9 +15,10 @@ Functions:
 """
 
 import argparse
+import sys
+
 from core.pcsc import PcscCard, connect_first_card, fetch_readers_list, connect_card
 from cards.detector import detect_card
-from cards.base_card import BaseCard
 
 
 def connect_first_reader():
@@ -37,7 +38,7 @@ def get_readers_list(override_exception: bool = False):
     Parameters:
         override_exception (bool): Override exception - prevents raising RuntimeError
     Returns:
-        list[PcscCard]: List of connected card readers
+        list[str]: List of connected card reader names
     """
     reader_list = fetch_readers_list(override_exception=override_exception)
     return reader_list
@@ -50,7 +51,7 @@ def connect_reader(reader_name):
         reader_name (str): Reader name
 
     Returns:
-        PcscCard | None: Card connection or None if reader not found
+        PcscCard: Card connection
     """
     card_reader = connect_card(reader_name)
     return card_reader
@@ -77,13 +78,15 @@ def auto_read_card():
         dict:    {"type": "ID" | "MED", "data": <CARD DATA>}
     """
     card_reader = connect_first_reader()
-    card_data = read_card(card_reader)
-    return card_data
+    try:
+        return read_card(card_reader)
+    finally:
+        card_reader.disconnect()
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Serbian smart card reader (ID / Medical / Vehicle)"
+        description="Serbian smart card reader (ID / Medical)"
     )
 
     group = parser.add_mutually_exclusive_group(required=True)
@@ -110,15 +113,19 @@ def main():
 
     # ---------------- LIST READERS ----------------
     if args.list:
-        readers = get_readers_list()
+        try:
+            readers = get_readers_list(override_exception=True)
+        except Exception as e:
+            print(f"Error listing card readers: {e}", file=sys.stderr)
+            return 1
         if not readers:
             print("No card readers found.")
-            return
+            return 0
 
         print("Connected readers:")
         for r in readers:
             print(f" - {r}")
-        return
+        return 0
 
     # ---------------- AUTO READ ----------------
     if args.auto:
@@ -126,23 +133,24 @@ def main():
             doc = auto_read_card()
             print(doc)
         except Exception as e:
-            print(f"Error reading card: {e}")
-        return
+            print(f"Error reading card: {e}", file=sys.stderr)
+            return 1
+        return 0
 
     # ---------------- READ FROM SPECIFIC READER ----------------
     if args.read:
-        reader = connect_reader(args.read)
-        if not reader:
-            print(f"Reader not found: {args.read}")
-            return
-
         try:
+            reader = connect_reader(args.read)
             doc = read_card(reader)
             print(doc)
         except Exception as e:
-            print(f"Error reading card: {e}")
-        return
+            print(f"Error reading card: {e}", file=sys.stderr)
+            return 1
+        finally:
+            if "reader" in locals():
+                reader.disconnect()
+        return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

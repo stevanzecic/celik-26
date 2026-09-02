@@ -61,6 +61,8 @@ def parse_id_personal(data: bytes, doc):
     doc.state_of_birth_code = s(f.get(1567, b""))
     doc.nationality_full = s(f.get(1583, b""))
     doc.purpose_of_stay = s(f.get(1683, b""))
+    if not doc.purpose_of_stay:
+        doc.purpose_of_stay = s(f.get(1582, b""))
     doc.e_note = s(f.get(1684, b""))
 
 
@@ -106,4 +108,3 @@ def parse_id_portrait(data: bytes):
         return Image.open(io.BytesIO(jpeg))
     except Exception:
         return None
-

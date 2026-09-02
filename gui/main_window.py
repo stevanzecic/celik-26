@@ -18,6 +18,7 @@ from card_reader_cli import get_readers_list
 
 from gui.widgets.id_card_widget import IdCardWidget
 from gui.widgets.medical_card_widget import MedicalCardWidget
+from gui.id_card_printer import print_id_document
 
 
 class MainWindow(QMainWindow):
@@ -70,9 +71,12 @@ class MainWindow(QMainWindow):
 
         self.save_btn = QPushButton("Save")
         self.save_btn.setEnabled(False)
+        self.save_btn.setToolTip("Saving is not implemented yet")
 
         self.print_btn = QPushButton("Print")
         self.print_btn.setEnabled(False)
+        self.print_btn.setToolTip("Read an ID card before printing")
+        self.print_btn.clicked.connect(self.print_current_card)
 
         self.button_layout.addStretch(1)
 
@@ -246,12 +250,11 @@ class MainWindow(QMainWindow):
         self.info_label.setText("Reader connected. Insert card.")
         self.status.showMessage(f"Connected to reader: {reader_name}")
 
-        # self.set_reader_status("no_reader")
-        self.refresh_readers()
         self.refresh_readers()
 
     def on_reader_disconnected(self):
         self.reader_name = None
+        self._clear_card_data()
 
         self.read_btn.setEnabled(False)
         self.read_btn.setToolTip("No reader connected")
@@ -268,14 +271,20 @@ class MainWindow(QMainWindow):
         if data["type"] == "ID":
             self.id_widget.set_data(data["data"])
             self.card_stack.setCurrentWidget(self.id_widget)
+            self.print_btn.setEnabled(True)
+            self.print_btn.setToolTip("")
             label = "ID card read successfully"
 
         elif data["type"] == "MED":
             self.med_widget.set_data(data["data"])
             self.card_stack.setCurrentWidget(self.med_widget)
+            self.print_btn.setEnabled(False)
+            self.print_btn.setToolTip("Printing medical cards is not implemented yet")
             label = "Medical card read successfully"
 
         else:
+            self.print_btn.setEnabled(False)
+            self.print_btn.setToolTip("Read an ID card before printing")
             label = "Card read successfully"
 
         # Update top label
@@ -284,20 +293,18 @@ class MainWindow(QMainWindow):
         # Update status bar
         self.status.showMessage(label)
 
-        # Enable actions
-        self.save_btn.setEnabled(True)
-        self.print_btn.setEnabled(True)
-
         # Update status icon
         self.set_reader_status("card_ok")
 
     def on_card_failed(self, msg):
         self.info_label.setText("Failed to read card. Retrying...")
         self.status.showMessage(msg)
+        self.save_btn.setEnabled(False)
+        self.print_btn.setEnabled(False)
+        self.set_reader_status("no_card")
 
     def on_no_card(self):
-        self.card_data = None
-        self.card_stack.setCurrentWidget(self.empty_label)
+        self._clear_card_data()
 
         self.info_label.setText("Reader connected. Insert card.")
         self.status.showMessage("No card in reader")
@@ -308,9 +315,43 @@ class MainWindow(QMainWindow):
         self.set_reader_status("no_card")
 
     def on_read_started(self):
+        self._clear_card_data()
         self.info_label.setText("Reading card...")
         self.status.showMessage("Reading card...")
+        self.save_btn.setEnabled(False)
+        self.print_btn.setEnabled(False)
         self.set_reader_status("no_card")  # yellow (blinking)
+
+    def _clear_card_data(self):
+        self.card_data = None
+        self.print_btn.setEnabled(False)
+        self.print_btn.setToolTip("Read an ID card before printing")
+        self.id_widget.clear_data()
+        self.med_widget.clear_data()
+        self.card_stack.setCurrentWidget(self.empty_label)
+
+    def print_current_card(self):
+        if not self.card_data or self.card_data.get("type") != "ID":
+            QMessageBox.information(
+                self,
+                "Print",
+                "Read an ID card before printing.",
+            )
+            return
+
+        try:
+            printed = print_id_document(self, self.card_data["data"])
+        except Exception as error:
+            QMessageBox.critical(
+                self,
+                "Print failed",
+                f"Could not print the ID card:\n{error}",
+            )
+            self.status.showMessage("ID card printing failed")
+            return
+
+        if printed:
+            self.status.showMessage("ID card sent to printer")
 
     def manual_read(self):
         if not self.reader_name:
@@ -321,7 +362,7 @@ class MainWindow(QMainWindow):
             )
             return
 
-        if not self.worker.card_connected:
+        if not self.worker.is_card_connected():
             QMessageBox.information(
                 self,
                 "No card",
@@ -330,7 +371,21 @@ class MainWindow(QMainWindow):
             return
 
         self.status.showMessage("Manual read triggered...")
-        self.worker.force_read()
+        if not self.worker.force_read():
+            self.on_no_card()
+
+    def closeEvent(self, event):
+        """Stop the polling thread before Qt destroys the window."""
+        self.worker.stop()
+        if not self.worker.wait(3000):
+            event.ignore()
+            QMessageBox.warning(
+                self,
+                "Reader busy",
+                "The card reader is still finishing an operation. Try closing again.",
+            )
+            return
+        event.accept()
 
     # ---------- Theme management ----------
 

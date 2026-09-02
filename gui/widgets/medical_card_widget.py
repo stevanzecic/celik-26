@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import (
     QPushButton, QMessageBox
 )
 from PyQt6.QtCore import pyqtSignal
-from datetime import datetime
 import threading
 
 from gui.widgets.label_row import LabelRow
@@ -65,9 +64,9 @@ class MedicalCardWidget(QWidget):
             # Taxpayer
             "taxpayer_name": LabelRow("Naziv obveznika:"),
             "taxpayer_res": LabelRow("Sedište:"),
-            "taxpayer_no": LabelRow("Registranski broj:"),
+            "taxpayer_no": LabelRow("Registarski broj:"),
             "taxpayer_id": LabelRow("PIB / JMBG:"),
-            "taxpayer_act": LabelRow("Delnost:"),
+            "taxpayer_act": LabelRow("Delatnost:"),
         }
 
         # ---------------- Layout ----------------
@@ -122,18 +121,23 @@ class MedicalCardWidget(QWidget):
     # =====================================================
 
     def set_data(self, doc):
+        if doc is not self._doc:
+            self._rfzo_in_progress = False
+            self.rfzo_btn.setText("Proveri važenje preko RFZO")
         self._doc = doc
 
-        self.title.setText(
-            f"{doc.first_name_latin} {doc.parent_name} {doc.last_name_latin}"
-        )
+        self.title.setText(doc.full_name_latin())
 
         self.rows["given"].set_value(f"{doc.first_name} ({doc.first_name_latin})")
         self.rows["parent"].set_value(doc.parent_name)
         self.rows["family"].set_value(f"{doc.last_name} ({doc.last_name_latin})")
         self.rows["birth"].set_value(doc.date_of_birth)
-        self.rows["place"].set_value(f"{doc.place}, {doc.municipality}")
-        self.rows["street"].set_value(doc.street)
+        self.rows["place"].set_value(
+            ", ".join(value for value in (doc.place, doc.municipality, doc.country) if value)
+        )
+        self.rows["street"].set_value(
+            " ".join(value for value in (doc.street, doc.number) if value)
+        )
         self.rows["gender"].set_value(doc.gender)
         self.rows["language"].set_value(doc.print_language)
         self.rows["lbo"].set_value(doc.insurant_number)
@@ -145,9 +149,16 @@ class MedicalCardWidget(QWidget):
         self.rows["permanent"].set_value("Da" if doc.permanently_valid else "Ne")
 
         # Optional sections
-        self._opt("carrier_name", f"{getattr(doc,'carrier_first_name','')} {getattr(doc,'carrier_last_name','')}")
+        self._opt(
+            "carrier_name",
+            " ".join(
+                value
+                for value in (doc.carrier_given_name_latin, doc.carrier_family_name_latin)
+                if value
+            ),
+        )
         self._opt("carrier_lbo", getattr(doc, "carrier_insurant_number", ""))
-        self._opt("carrier_jmbg", getattr(doc, "carrier_jmbg", ""))
+        self._opt("carrier_jmbg", getattr(doc, "carrier_id_number", ""))
         self._opt("carrier_relation", getattr(doc, "carrier_relationship", ""))
 
         self._opt("insurance_basis", getattr(doc, "insurance_basis_rzzo", ""))
@@ -162,6 +173,15 @@ class MedicalCardWidget(QWidget):
 
         self.rfzo_btn.setEnabled(bool(doc.card_id and doc.insurant_number))
 
+    def clear_data(self):
+        self._doc = None
+        self._rfzo_in_progress = False
+        self.title.clear()
+        self.rfzo_btn.setText("Proveri važenje preko RFZO")
+        self.rfzo_btn.setEnabled(False)
+        for row in self.rows.values():
+            row.set_value("")
+
     # =====================================================
     # RFZO
     # =====================================================
@@ -175,24 +195,30 @@ class MedicalCardWidget(QWidget):
         self.rfzo_btn.setText("Provera u toku...")
         self.rows["valid"].set_value("Provera u toku...")
 
+        document = self._doc
+
         def worker():
             error = None
             try:
-                self._doc.update_from_rfzo(timeout=8)
+                document.update_from_rfzo(timeout=8)
             except Exception as e:
                 error = str(e)
-            self._rfzo_finished.emit(error)
+            self._rfzo_finished.emit((document, error))
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _on_rfzo_finished(self, error):
+    def _on_rfzo_finished(self, result):
+        document, error = result
+        if document is not self._doc:
+            return
+
         self._rfzo_in_progress = False
         self.rfzo_btn.setEnabled(True)
         self.rfzo_btn.setText("Proveri važenje preko RFZO")
 
         if error:
             QMessageBox.warning(self, "RFZO", error)
-        self.rows["valid"].set_value(self._doc.valid_until)
+        self.rows["valid"].set_value(document.valid_until)
 
     # =====================================================
     # Helpers

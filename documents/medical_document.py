@@ -7,11 +7,10 @@ MedicalDocument model for Serbian Medical Insurance Card.
 - No threading
 """
 
-from dataclasses import dataclass, field
-import requests
 import re
+from dataclasses import dataclass
 
-RFZO_URL = "https://www.rfzo.rs/proveraUplateDoprinosa2.php"
+RFZO_URL = "https://rfzo.rs/api_overa.php"
 
 
 class RfzoError(Exception):
@@ -43,6 +42,7 @@ class MedicalDocument:
     last_name: str = ""
     last_name_latin: str = ""
     parent_name: str = ""
+    parent_name_latin: str = ""
 
     gender: str = ""
     jmbg: str = ""
@@ -51,15 +51,41 @@ class MedicalDocument:
     date_of_birth: str = ""
     date_of_issue: str = ""
     date_of_expiry: str = ""
+    chip_serial_number: str = ""
 
     street: str = ""
+    street_code: str = ""
+    number: str = ""
+    entrance: str = ""
+    apartment: str = ""
     place: str = ""
+    post_number: str = ""
     municipality: str = ""
+    country: str = ""
 
     valid_until: str = ""
     permanently_valid: bool = False
 
     print_language: str = ""
+
+    carrier_given_name: str = ""
+    carrier_given_name_latin: str = ""
+    carrier_family_name: str = ""
+    carrier_family_name_latin: str = ""
+    carrier_id_number: str = ""
+    carrier_insurant_number: str = ""
+    carrier_family_member: bool = False
+    carrier_relationship: str = ""
+
+    insurance_basis_rzzo: str = ""
+    insurance_start_date: str = ""
+    insurance_description: str = ""
+
+    taxpayer_name: str = ""
+    taxpayer_residence: str = ""
+    taxpayer_number: str = ""
+    taxpayer_id_number: str = ""
+    taxpayer_activity_code: str = ""
 
     # -------- RFZO enriched data --------
 
@@ -69,59 +95,81 @@ class MedicalDocument:
     # -------- Helpers --------
 
     def full_name_latin(self) -> str:
-        return f"{self.first_name_latin} {self.parent_name} {self.last_name_latin}"
+        return " ".join(
+            value
+            for value in (
+                self.first_name_latin,
+                self.parent_name_latin,
+                self.last_name_latin,
+            )
+            if value
+        )
 
     def full_address(self) -> str:
-        addr = f"{self.street}, {self.place}"
-        if self.municipality:
-            addr += f" ({self.municipality})"
-        return addr
+        street = " ".join(value for value in (self.street, self.number) if value)
+        place = ", ".join(
+            value for value in (self.place, self.municipality, self.country) if value
+        )
+        return ", ".join(value for value in (street, place) if value)
 
     # -------- RFZO UPDATE (MANUAL) --------
 
     def update_from_rfzo(self, timeout=8):
         if len(self.card_id) != 11:
-            raise ValueError("Invalid card number length")
+            raise InvalidCardNumber("Invalid card number length")
 
         if len(self.insurant_number) != 11:
-            raise ValueError("Invalid insurance number length")
+            raise InvalidInsurantNumber("Invalid insurance number length")
 
-        resp = requests.post(
+        # Keep the optional web dependency out of the offline card-reading path.
+        import requests
+
+        resp = requests.get(
             RFZO_URL,
-            data={
-                "zk": self.card_id,
-                "lbo": self.insurant_number
+            params={
+                "kzo": self.card_id,
+                "lbo": self.insurant_number,
             },
             timeout=(4, timeout),
         )
 
         resp.raise_for_status()
 
-        match = re.search(
-            r"оверена до:\s*<strong>(\d+\.\d+\.\d+\.)</strong>",
-            resp.text
-        )
+        try:
+            payload = resp.json()
+        except (TypeError, ValueError) as exc:
+            raise RfzoParseError("RFZO returned an invalid JSON response") from exc
 
-        if not match:
-            raise ValueError("RFZO response did not contain validity date")
+        value = self._parse_rfzo_payload(payload)
+        self.rfzo_valid_until = value
+        self.rfzo_checked = True
+        self.valid_until = value
+        return value
 
-        self.valid_until = match.group(1)
-
-    # -------- RFZO HTML parsing --------
+    # -------- RFZO JSON parsing --------
 
     @staticmethod
-    def _parse_rfzo_valid_until(html: str) -> str:
-        """
-        Extract 'оверена до' date from RFZO HTML response.
-        """
-
-        match = re.search(
-            r"оверена до:\s*<strong>(\d+\.\d+\.\d+\.)</strong>",
-            html,
-            re.IGNORECASE,
+    def _normalize_rfzo_date(value) -> str:
+        """Validate and normalize the date returned by the RFZO API."""
+        match = re.fullmatch(
+            r"\s*(\d{1,2})\.(\d{1,2})\.(\d{4})\.?\s*",
+            str(value or ""),
         )
-
         if not match:
-            raise RfzoParseError("Could not extract validity date from RFZO response")
+            raise RfzoParseError("RFZO response did not contain a validity date")
 
-        return match.group(1)
+        day, month, year = match.groups()
+        return f"{int(day):02d}.{int(month):02d}.{year}."
+
+    @classmethod
+    def _parse_rfzo_payload(cls, payload) -> str:
+        """Extract the validity date from the current RFZO JSON response."""
+        if isinstance(payload, list):
+            if not payload:
+                raise RfzoParseError("RFZO did not return card data")
+            payload = payload[0]
+
+        if not isinstance(payload, dict):
+            raise RfzoParseError("RFZO returned an unexpected response format")
+
+        return cls._normalize_rfzo_date(payload.get("zk_overena_do"))

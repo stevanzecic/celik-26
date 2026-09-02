@@ -20,7 +20,7 @@ def main():
     if theme == "dark":
         apply_stylesheet(app, theme="dark_teal.xml")
     elif theme == "light":
-        apply_stylesheet(app, theme="light_teal.xml")
+        apply_stylesheet(app, theme="light_blue.xml")
     else:
         apply_stylesheet(app, theme="dark_teal.xml")
 

@@ -51,6 +51,7 @@ class GemaltoIDCard(BaseCard):
         """
         try:
             self.init_card()
+            self._read_file_internal(b"\x0F\x02")
             return True
         except Exception:
             return False
@@ -78,7 +79,7 @@ class GemaltoIDCard(BaseCard):
         Returns:
             None
         """
-        apdu = build_apdu(0x00, 0xA4, 0x08, 0x00, fid)
+        apdu = build_apdu(0x00, 0xA4, 0x08, 0x00, fid, 4)
         rsp = self.pcsc.transmit(apdu)
 
         if rsp[-2:] != b"\x90\x00":
@@ -113,6 +114,11 @@ class GemaltoIDCard(BaseCard):
                 break
             data += chunk
             offset += len(chunk)
+
+        if len(data) != total_len:
+            raise RuntimeError(
+                f"File data truncated: expected {total_len} bytes, got {len(data)}"
+            )
 
         return data
 
@@ -166,16 +172,3 @@ class GemaltoIDCard(BaseCard):
         """
         self.read()
         return self.get_document()
-
-    # TEST:
-    def test_read(self):
-        """
-        Test reading the card data.
-        """
-        DOC_FID = b"\x0F\x02"
-
-        raw = self._read_file(DOC_FID)
-
-        print("DOCUMENT FILE LEN:", len(raw))
-        print("DOCUMENT FILE HEX (first 64):", raw[:64].hex())
-        print("DOCUMENT FILE HEX (last 64):", raw[-64:].hex())

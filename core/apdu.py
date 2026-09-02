@@ -27,6 +27,17 @@ def build_apdu(
     Returns:
         list[int]: APDU bytes
     """
+    for name, value in (("cla", cla), ("ins", ins), ("p1", p1), ("p2", p2)):
+        if not isinstance(value, int) or not 0 <= value <= 0xFF:
+            raise ValueError(f"{name} must be an integer between 0 and 255")
+
+    if not isinstance(data, bytes):
+        raise TypeError("data must be bytes")
+    if len(data) > 0xFF:
+        raise ValueError("Only short APDUs (up to 255 data bytes) are supported")
+    if le is not None and (not isinstance(le, int) or not 1 <= le <= 0x100):
+        raise ValueError("le must be between 1 and 256")
+
     apdu = [cla, ins, p1, p2]
 
     if data:
@@ -34,7 +45,8 @@ def build_apdu(
         apdu.extend(data)
 
     if le is not None:
-        apdu.append(le)
+        # In a short APDU, Le=0 encodes an expected length of 256 bytes.
+        apdu.append(0 if le == 0x100 else le)
 
     return apdu
 
@@ -49,6 +61,13 @@ def read_binary(pcsc, offset: int, length: int) -> bytes:
     Returns:
         bytes: Binary data
     """
+    if not isinstance(offset, int) or not 0 <= offset < 0xFFFF:
+        raise ValueError("offset must be between 0 and 65534")
+    if not isinstance(length, int) or length < 0:
+        raise ValueError("length must be a non-negative integer")
+    if length == 0:
+        return b""
+
     p1 = (offset >> 8) & 0xFF
     p2 = offset & 0xFF
 

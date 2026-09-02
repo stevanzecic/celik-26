@@ -5,8 +5,9 @@ Class: MedicalCard
 Easy access: use read_and_retrieve_document() method to initialize card and retrieve document data
 """
 from cards.base_card import BaseCard
-from core.tlv import parse_tlv
 from core.apdu import build_apdu, read_binary
+from core.encoding import _decode_utf16le
+from core.tlv import parse_tlv
 from documents.medical_document import MedicalDocument
 from documents.medical_parser import (
     parse_medical_document,
@@ -40,9 +41,11 @@ class MedicalCard(BaseCard):
             bool: True if card is Serbian Medical, False otherwise
         """
         try:
-            apdu = build_apdu(0x00, 0xA4, 0x04, 0x00, MEDICAL_AID)
-            rsp = self.pcsc.transmit(apdu)
-            return rsp[-2:] == b"\x90\x00"
+            self.init_card()
+            fields = parse_tlv(self._read_file(MED_DOC))
+            return _decode_utf16le(fields.get(1553, b"")) == (
+                "Републички фонд за здравствено осигурање"
+            )
         except Exception:
             return False
 
@@ -93,13 +96,6 @@ class MedicalCard(BaseCard):
         parse_medical_fixed_personal(self._med_fixed, doc)
         parse_medical_variable_personal(self._med_var, doc)
         parse_medical_variable_admin(self._med_admin, doc)
-
-        raw = self._read_file(b"\x0D\x01")
-        fields = parse_tlv(raw)
-
-        print("MED DOC TLV TAGS:", sorted(fields.keys()))
-        print("MED DOC RAW HEX (first 64):", raw[:64].hex())
-        print("MED DOC RAW HEX (last 64):", raw[-64:].hex())
 
         return doc
 

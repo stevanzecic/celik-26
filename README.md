@@ -4,11 +4,11 @@
   <img src="./assets/img/celik-26-logo-nbg.png" width="45%" alt="celik-26-logo">
 </p>
 
-`v0.1.1`
+`v0.1.2`
 
 </div>
 
-**CELIK-26** is a Python smart card reader for ID and Medical cards issued by Serbian authorities.
+**CELIK-26** is a Python/PyQt6 smart-card reader for identity and medical cards issued by Serbian authorities.
 
 ---
 
@@ -24,7 +24,13 @@
   - [Python API](#python-api)
 - [RUNNING CELIK-26](#running-celik-26)
   - [From source](#from-source)
+  - [Tests](#tests)
 - [CHANGELOG](#changelog)
+  - [v0.1.2](#v012)
+    - [Added](#added)
+    - [Improved](#improved)
+    - [Fixed](#fixed)
+    - [Removed](#removed)
   - [v0.1.1](#v011)
   - [v0.1.0](#v010)
 - [LICENSE](#license)
@@ -56,15 +62,19 @@ celik-26/
 │   └── medical/
 │       └── medical.py
 |
-├── test/
-│   └── main.py
+├── gui/
+│   ├── settings/
+│   ├── widgets/
+│   ├── workers/
+│   ├── app.py
+│   └── main_window.py
 │
 ├── core/
 │   ├── apdu.py
 │   ├── atr.py
 │   ├── container.py
 │   ├── encoding.py
-|   ├── pscs.py
+|   ├── pcsc.py
 │   └── tlv.py
 │
 ├── documents/
@@ -73,8 +83,14 @@ celik-26/
 │   ├── medical_document.py
 │   └── medical_parser.py
 │
+├── tests/
+│   ├── test_cards.py
+│   ├── test_core.py
+│   └── test_documents.py
+│
 ├── .gitignore
 ├── card_reader_cli.py
+├── card_reader_gui.py
 ├── README.md
 └── requirements.txt
 ```
@@ -83,16 +99,17 @@ celik-26/
 
 - Automatic card type detection via ATR + AID probing
 - Support for multiple card manufacturers (Gemalto, Apollo)
-- Full TLV parsing for Serbian documents
+- Strict TLV parsing with malformed-data detection
 - UTF-16 decoding (Cyrillic & Latin)
 - PC/SC compatible (ACS, Gemalto, OMNIKEY readers)
-- CLI interface (GUI-ready backend)
+- CLI and PyQt6 desktop interfaces
+- Background reader/card polling with manual reader selection
 
 ### 🧩 Supported Cards
 
 | Card Type                      | Status            |
 | ------------------------------ | ----------------- |
-| Serbian ID (Gemalto / Veridos) | ✅ Fully supported |
+| Serbian ID (Gemalto / Veridos) | ✅ Supported       |
 | Serbian ID (Apollo - legacy)   | ✅ Supported       |
 | Serbian Medical Card           | ✅ Supported       |
 | Vehicle Registration Card      | ⏳ Planned         |
@@ -187,14 +204,31 @@ To run the project from source, follow these steps:
    source venv/bin/activate        # Linux/macOS
    venv\Scripts\activate.bat       # Windows
    ```
-4. Install dependencies
+4. On Debian/Ubuntu, install the system packages required by `pyscard`:
+   ```bash
+   sudo apt install libpcsclite-dev swig build-essential
+   ```
+   Then install the Python dependencies:
    ```bash
    pip install -r requirements.txt
    ```
-5. Run the project in **IDE**, or from command line:
+5. Run the GUI:
+   ```bash
+   python3 card_reader_gui.py
+   ```
+   Or run the CLI:
    ```bash
    python3 card_reader_cli.py -a
    ```
+
+### Tests
+
+The automated tests use synthetic card records and do not require a physical
+reader or personal card data:
+
+```bash
+python3 -m unittest discover -v
+```
 
 **Dependencies**
 
@@ -213,6 +247,38 @@ To run the project from source, follow these steps:
 ---
 
 ## CHANGELOG
+
+### v0.1.2
+
+#### Added
+
+- Added support for legacy Apollo Serbian ID cards
+- Added ATR recognition with AID probing for more reliable card type detection
+- Added redesigned identity card and medical card data views
+- Added A4 identity card printing through the system print dialog
+- Added automated tests for card protocols, parsers, encoding, TLV/APDU handling, document models, and printing
+
+#### Improved
+
+- Expanded identity card and medical card field parsing
+- Improved reader selection, background polling, card removal handling, and application shutdown
+- Improved address and date formatting to match the official Serbian ID card reader
+- Improved APDU response validation and malformed or truncated card data detection
+- Improved UTF-16 decoding and Serbian medical card tag mapping
+
+#### Fixed
+
+- Fixed Apollo and Gemalto file selection and binary reading
+- Fixed detection of cards sharing the same ATR
+- Fixed stale card data and portrait images remaining visible after card removal
+- Fixed invalid dates such as `01.01.0001.` being displayed as real dates
+- Fixed the incorrectly named `requiremets.txt` file
+
+#### Removed
+
+- Removed obsolete test scripts and raw medical card data logging
+- Disabled unfinished Save and medical card printing actions
+
 
 ### v0.1.1
 

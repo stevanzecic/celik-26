@@ -7,6 +7,7 @@ Easy access: use read_and_retrieve_document() method to initialize card and retr
 import struct
 from cards.base_card import BaseCard
 from cards.id.atr import APOLLO_ATR
+from core.apdu import read_binary
 from documents.id_document import IdDocument
 from documents.id_parser import (
     parse_id_document,
@@ -63,10 +64,10 @@ class ApolloIDCard(BaseCard):
             bytes: File data (bytes)
         """
         # SELECT FILE (same as Go)
-        self._select_file(fid, p1=0x08, p2=0x00)
+        self._select_file(fid, p1=0x08, p2=0x00, le=4)
 
         # Apollo header is 6 bytes
-        header = self._read_binary(0, 6)
+        header = read_binary(self.pcsc, 0, 6)
         if len(header) < 6:
             raise RuntimeError("File header too short")
 
@@ -76,12 +77,15 @@ class ApolloIDCard(BaseCard):
         out = bytearray()
 
         while length > 0:
-            chunk = self._read_binary(offset, length)
+            chunk = read_binary(self.pcsc, offset, length)
             if not chunk:
                 break
             out.extend(chunk)
             offset += len(chunk)
             length -= len(chunk)
+
+        if length != 0:
+            raise RuntimeError(f"File data truncated: {length} bytes missing")
 
         return bytes(out)
 
@@ -120,4 +124,3 @@ class ApolloIDCard(BaseCard):
         """
         self.read()
         return self.get_document()
-

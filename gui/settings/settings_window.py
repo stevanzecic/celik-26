@@ -1,12 +1,9 @@
 """
 CELIK-26 GUI settings window.
-Handles theme and language settings.
+Handles the application theme setting.
 """
 
-from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel,
-    QComboBox, QPushButton, QFormLayout
-)
+from PyQt6.QtWidgets import QComboBox, QDialog, QFormLayout, QPushButton, QVBoxLayout
 from PyQt6.QtCore import QSettings, pyqtSignal
 
 
@@ -28,11 +25,7 @@ class SettingsWindow(QDialog):
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["dark", "light", "auto"])
 
-        self.lang_combo = QComboBox()
-        self.lang_combo.addItems(["English", "Srpski"])
-
         form.addRow("Theme:", self.theme_combo)
-        form.addRow("Language:", self.lang_combo)
 
         layout.addLayout(form)
 
@@ -46,16 +39,10 @@ class SettingsWindow(QDialog):
         self.theme_combo.setCurrentText(
             self.settings.value("theme", "dark")
         )
-        self.lang_combo.setCurrentText(
-            self.settings.value("language", "English")
-        )
 
     def save(self):
         theme = self.theme_combo.currentText()
-        language = self.lang_combo.currentText()
-
         self.settings.setValue("theme", theme)
-        self.settings.setValue("language", language)
 
         self.theme_changed.emit(theme)
         self.accept()

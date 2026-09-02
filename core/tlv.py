@@ -23,17 +23,27 @@ def parse_tlv(data: bytes) -> dict[int, bytes]:
     Returns:
         dict[int, bytes]: Parsed TLV data
     """
+    if not isinstance(data, bytes):
+        raise TypeError("data must be bytes")
+    if not data:
+        raise ValueError("TLV data is empty")
+
     pos = 0
     n = len(data)
     result = {}
 
-    while pos + 4 <= n:
+    while pos < n:
+        if pos + 4 > n:
+            raise ValueError(f"Truncated TLV header at offset {pos}")
+
         tag = int.from_bytes(data[pos:pos+2], "little")
         length = int.from_bytes(data[pos+2:pos+4], "little")
         pos += 4
 
         if pos + length > n:
-            break
+            raise ValueError(
+                f"Truncated TLV value for tag {tag}: expected {length} bytes"
+            )
 
         value = data[pos:pos+length]
         pos += length
