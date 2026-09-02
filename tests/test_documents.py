@@ -183,6 +183,11 @@ class MedicalParserTests(unittest.TestCase):
         get.assert_called_once_with(
             "https://rfzo.rs/api_overa.php",
             params={"kzo": "12345678901", "lbo": "10987654321"},
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Referer": "https://rfzo.rs/",
+                "User-Agent": "Mozilla/5.0",
+            },
             timeout=(4, 5),
         )
 
@@ -197,6 +202,20 @@ class MedicalParserTests(unittest.TestCase):
 
         with patch.dict("sys.modules", {"requests": SimpleNamespace(get=get)}):
             with self.assertRaisesRegex(RfzoParseError, "invalid JSON"):
+                doc.update_from_rfzo()
+
+    def test_rfzo_update_reports_html_response_as_service_issue(self):
+        response = Mock()
+        response.headers = {"Content-Type": "text/html; charset=UTF-8"}
+        response.json.side_effect = ValueError("invalid JSON")
+        get = Mock(return_value=response)
+        doc = MedicalDocument(
+            card_id="12345678901",
+            insurant_number="10987654321",
+        )
+
+        with patch.dict("sys.modules", {"requests": SimpleNamespace(get=get)}):
+            with self.assertRaisesRegex(RfzoParseError, "returned a web page"):
                 doc.update_from_rfzo()
 
 

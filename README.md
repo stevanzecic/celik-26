@@ -25,6 +25,10 @@
 - [RUNNING CELIK-26](#running-celik-26)
   - [From source](#from-source)
   - [Tests](#tests)
+- [USAGE NOTES](#usage-notes)
+  - [Printing](#printing)
+  - [RFZO verification](#rfzo-verification)
+  - [Privacy](#privacy)
 - [CHANGELOG](#changelog)
   - [v0.1.2](#v012)
     - [Added](#added)
@@ -104,6 +108,9 @@ celik-26/
 - PC/SC compatible (ACS, Gemalto, OMNIKEY readers)
 - CLI and PyQt6 desktop interfaces
 - Background reader/card polling with manual reader selection
+- Full identity-card and medical-card data views, including portrait display
+- A4 identity-card printing through the native system print dialog
+- Optional on-demand RFZO insurance-validity lookup for medical cards
 
 ### 🧩 Supported Cards
 
@@ -212,6 +219,8 @@ To run the project from source, follow these steps:
    ```bash
    pip install -r requirements.txt
    ```
+   On Windows, install the driver for the card reader and ensure that the
+   **Smart Card** service is running before starting the application.
 5. Run the GUI:
    ```bash
    python3 card_reader_gui.py
@@ -241,8 +250,37 @@ python3 -m unittest discover -v
     | Pillow | >=12.0.0 |
     | PyQt6 | >=6.10.1 |
     | qt-material | >=2.17 |
+    | requests | >=2.32.0 |
 
 [🔝 Back to top](#top)
+
+---
+
+## USAGE NOTES
+
+### Printing
+
+After a Serbian identity card has been read successfully, select **Print** in
+the desktop application. The app first opens an A4 print preview; use its
+**Print** action to select a system printer and print the displayed page.
+Medical-card printing is not implemented.
+
+### RFZO verification
+
+The medical-card view can request an updated insurance-validity date from the
+public RFZO service using the card's KZO and LBO values. This is an on-demand
+network request; reading card data itself stays offline. If RFZO returns its
+website instead of verification data, the app reports that the verification
+service is unavailable and keeps the date stored on the card unchanged.
+
+### Privacy
+
+Card data, including the portrait and personal details, is read locally from
+the inserted card. The application does not upload card data during normal
+reading or printing. The only external request is the explicit RFZO validity
+check described above, which sends the KZO and LBO values required by RFZO.
+
+[Back to top](#top)
 
 ---
 
@@ -256,6 +294,8 @@ python3 -m unittest discover -v
 - Added ATR recognition with AID probing for more reliable card type detection
 - Added redesigned identity card and medical card data views
 - Added A4 identity card printing through the system print dialog
+- Added an A4 print preview before identity-card printing
+- Added an explicit RFZO insurance-validity check in the medical-card view
 - Added automated tests for card protocols, parsers, encoding, TLV/APDU handling, document models, and printing
 
 #### Improved
@@ -265,6 +305,8 @@ python3 -m unittest discover -v
 - Improved address and date formatting to match the official Serbian ID card reader
 - Improved APDU response validation and malformed or truncated card data detection
 - Improved UTF-16 decoding and Serbian medical card tag mapping
+- Improved GUI reader status, manual reader selection, and theme handling
+- Improved RFZO requests to match the public service and identify HTML service fallbacks clearly
 
 #### Fixed
 
@@ -272,6 +314,7 @@ python3 -m unittest discover -v
 - Fixed detection of cards sharing the same ATR
 - Fixed stale card data and portrait images remaining visible after card removal
 - Fixed invalid dates such as `01.01.0001.` being displayed as real dates
+- Fixed stale data after a reader disconnects
 - Fixed the incorrectly named `requiremets.txt` file
 
 #### Removed

@@ -64,8 +64,8 @@ def build_id_print_data(doc, printed_at=None):
     }
 
 
-def print_id_document(parent, doc):
-    """Open the system dialog and paint exactly one A4 ID-card page."""
+def _render_id_document(printer, doc):
+    """Paint exactly one A4 ID-card page on ``printer``."""
     from PyQt6.QtCore import QLineF, QRectF, Qt
     from PyQt6.QtGui import (
         QFont,
@@ -75,24 +75,8 @@ def print_id_document(parent, doc):
         QPainter,
         QPen,
     )
-    from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
-    from PyQt6.QtWidgets import QDialog
-
-    printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-    printer.setDocName("Očitana lična karta")
-    printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
-    printer.setPageOrientation(QPageLayout.Orientation.Portrait)
-    printer.setFullPage(True)
-
-    dialog = QPrintDialog(printer, parent)
-    dialog.setWindowTitle("Štampanje lične karte")
-    if dialog.exec() != QDialog.DialogCode.Accepted:
-        return False
-    if not printer.isValid():
-        raise RuntimeError("Selected printer is not available")
-
-    # The print dialog can change page settings, so enforce the document format
-    # immediately before painting.
+    # Preview and the selected printer can use different resolutions. Use A4
+    # points as logical coordinates so both receive the same layout.
     printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
     printer.setPageOrientation(QPageLayout.Orientation.Portrait)
     printer.setFullPage(True)
@@ -102,8 +86,6 @@ def print_id_document(parent, doc):
         raise RuntimeError("Could not start the print job")
 
     try:
-        # Use A4 points as logical coordinates. This makes the layout independent
-        # of printer/PDF resolution and prevents QTextDocument pagination.
         painter.setViewport(0, 0, printer.width(), printer.height())
         painter.setWindow(0, 0, 595, 842)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -208,4 +190,83 @@ def print_id_document(parent, doc):
     finally:
         painter.end()
 
-    return True
+
+
+def print_id_document(parent, doc):
+    """Preview an ID-card printout with a menu bar and let the user print it.
+
+    Deliberately built from ``QPrintPreviewWidget`` + a plain ``QMenuBar``
+    instead of ``QPrintPreviewDialog``. The stock dialog's toolbar is a
+    private, undocumented widget: under the app-wide qt_material stylesheet
+    (see app.py's apply_stylesheet(...) call) its buttons get padded wide
+    enough that Print is pushed into an overflow "»" button that's nearly
+    invisible until hovered. A menu bar has no row-width limit, so that
+    failure mode doesn't exist here at all.
+    """
+    from PyQt6.QtGui import QAction, QKeySequence, QPageLayout, QPageSize
+    from PyQt6.QtPrintSupport import QPrintDialog, QPrintPreviewWidget, QPrinter
+    from PyQt6.QtWidgets import QDialog, QMenuBar, QVBoxLayout
+
+    printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+    printer.setDocName("Očitana lična karta")
+    printer.setPageSize(QPageSize(QPageSize.PageSizeId.A4))
+    printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+    printer.setFullPage(True)
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("Pregled štampe lične karte")
+    dialog.resize(1000, 800)
+
+    preview_widget = QPrintPreviewWidget(printer, dialog)
+    preview_widget.paintRequested.connect(
+        lambda preview_printer: _render_id_document(preview_printer, doc)
+    )
+
+    def do_print():
+        # Mirrors QPrintPreviewDialog's own behaviour: let the user pick a
+        # printer/settings first, then render the page and send the job.
+        print_dialog = QPrintDialog(printer, dialog)
+        if print_dialog.exec() == QDialog.DialogCode.Accepted:
+            preview_widget.print()
+            dialog.accept()
+
+    menu_bar = QMenuBar(dialog)
+
+    print_action = QAction("Štampaj", dialog)
+    print_action.setShortcut(QKeySequence.StandardKey.Print)
+    print_action.triggered.connect(do_print)
+    menu_bar.addAction(print_action)
+
+    close_action = QAction("Zatvori", dialog)
+    close_action.setShortcut(QKeySequence.StandardKey.Close)
+    close_action.triggered.connect(dialog.reject)
+    menu_bar.addAction(close_action)
+
+    view_menu = menu_bar.addMenu("Prikaz")
+
+    zoom_in_action = QAction("Uvećaj", dialog)
+    zoom_in_action.setShortcut(QKeySequence.StandardKey.ZoomIn)
+    zoom_in_action.triggered.connect(preview_widget.zoomIn)
+    view_menu.addAction(zoom_in_action)
+
+    zoom_out_action = QAction("Umanji", dialog)
+    zoom_out_action.setShortcut(QKeySequence.StandardKey.ZoomOut)
+    zoom_out_action.triggered.connect(preview_widget.zoomOut)
+    view_menu.addAction(zoom_out_action)
+
+    view_menu.addSeparator()
+
+    fit_width_action = QAction("Prilagodi širini", dialog)
+    fit_width_action.triggered.connect(preview_widget.fitToWidth)
+    view_menu.addAction(fit_width_action)
+
+    fit_page_action = QAction("Prilagodi strani", dialog)
+    fit_page_action.triggered.connect(preview_widget.fitInView)
+    view_menu.addAction(fit_page_action)
+
+    layout = QVBoxLayout(dialog)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setMenuBar(menu_bar)
+    layout.addWidget(preview_widget)
+
+    return dialog.exec() == QDialog.DialogCode.Accepted

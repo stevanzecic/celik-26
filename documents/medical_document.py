@@ -11,6 +11,7 @@ import re
 from dataclasses import dataclass
 
 RFZO_URL = "https://rfzo.rs/api_overa.php"
+RFZO_REFERER = "https://rfzo.rs/"
 
 
 class RfzoError(Exception):
@@ -130,6 +131,14 @@ class MedicalDocument:
                 "kzo": self.card_id,
                 "lbo": self.insurant_number,
             },
+            # RFZO's public form calls this endpoint from its own site.  Send the
+            # same essential request metadata; some deployments otherwise return
+            # the web page instead of the API response.
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Referer": RFZO_REFERER,
+                "User-Agent": "Mozilla/5.0",
+            },
             timeout=(4, timeout),
         )
 
@@ -138,6 +147,12 @@ class MedicalDocument:
         try:
             payload = resp.json()
         except (TypeError, ValueError) as exc:
+            content_type = str(resp.headers.get("Content-Type", "")).lower()
+            if "html" in content_type:
+                raise RfzoParseError(
+                    "RFZO verification service returned a web page instead of "
+                    "verification data. Please try again later."
+                ) from exc
             raise RfzoParseError("RFZO returned an invalid JSON response") from exc
 
         value = self._parse_rfzo_payload(payload)
