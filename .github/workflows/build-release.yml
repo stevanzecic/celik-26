@@ -1,0 +1,115 @@
+name: Build and release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch or tag to build
+        required: true
+        default: main
+        type: string
+      release_tag:
+        description: Optional release tag (leave empty for a build-only run)
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            separator: ";"
+            archive: zip
+          - os: macos-latest
+            separator: ":"
+            archive: tar.gz
+          - os: ubuntu-latest
+            separator: ":"
+            archive: tar.gz
+
+    steps:
+      - name: Check out selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+
+      - name: Install Linux smart-card build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libpcsclite-dev swig
+
+      - name: Install macOS smart-card build dependencies
+        if: runner.os == 'macOS'
+        run: brew install pkg-config pcsc-lite
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Run tests
+        run: python -m unittest discover -v
+
+      - name: Build executable
+        shell: bash
+        run: >-
+          pyinstaller --clean --noconfirm --onefile --windowed
+          --name "CELIK-26-${{ runner.os }}"
+          --add-data "assets${{ matrix.separator }}assets"
+          --add-data "gui/translations${{ matrix.separator }}gui/translations"
+          --collect-all qt_material
+          card_reader_gui.py
+
+      - name: Archive Windows executable
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/CELIK-26-Windows.exe" -DestinationPath "CELIK-26-Windows.zip"
+
+      - name: Archive Unix executable
+        if: runner.os != 'Windows'
+        run: tar -czf "CELIK-26-${{ runner.os }}.tar.gz" -C dist "CELIK-26-${{ runner.os }}"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: CELIK-26-${{ runner.os }}
+          path: CELIK-26-${{ runner.os }}.${{ matrix.archive }}
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: github.event_name == 'push' || inputs.release_tag != ''
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out selected ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          RELEASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref_name }}
+        run: gh release create "$RELEASE_TAG" release-assets/* --target "$RELEASE_REF" --generate-notes --title "$RELEASE_TAG"

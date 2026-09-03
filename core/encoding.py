@@ -1,3 +1,6 @@
+from datetime import date
+
+
 # ---------------- DATE FORMATTERS - ID CARD ----------------
 
 def s(data: bytes) -> str:
@@ -9,7 +12,7 @@ def s(data: bytes) -> str:
     Returns:
         str: Decoded string
     """
-    return data.decode("utf-8", "ignore").strip()
+    return data.decode("utf-8", "ignore").strip("\x00 \t\r\n")
 
 def format_date_yyyymmdd(value: str) -> str:
     """
@@ -27,7 +30,7 @@ def format_date_yyyymmdd(value: str) -> str:
 
 def format_date_ddmmyyyy(value: str) -> str:
     """
-    Converts DDMMYYYY → DD.MM.YYYY
+    Converts DDMMYYYY → DD.MM.YYYY.
     Leaves value unchanged if length is unexpected.
 
     Parameters:
@@ -36,47 +39,60 @@ def format_date_ddmmyyyy(value: str) -> str:
         str: Formatted date
     """
     if len(value) == 8 and value.isdigit():
-        return f"{value[0:2]}.{value[2:4]}.{value[4:8]}"
+        day = int(value[0:2])
+        month = int(value[2:4])
+        year = int(value[4:8])
+
+        # 01.01.0001 is the card/service sentinel for an unavailable date.
+        if year <= 1:
+            return ""
+
+        try:
+            date(year, month, day)
+        except ValueError:
+            return ""
+
+        return f"{day:02d}.{month:02d}.{year:04d}."
     return value
 
 # ---------------- DATE FORMATTERS - MEDICAL CARD ----------------
 
 def decode_utf16le_date(value: bytes) -> str:
     """
-    Expects DDMMYYYY as UTF-16LE, returns YYYY-MM-DD
+    Expects DDMMYYYY as UTF-16LE, returns DD.MM.YYYY.
 
     Parameters:
         value (bytes): Date value
     Returns:
-        str: Formatted date (YYYY-MM-DD) or empty string if failed
+        str: Formatted date (DD.MM.YYYY.) or empty string if failed
     """
     if not value:
         return ""
 
-    # UTF-16LE digits: digit byte is ALWAYS the LOW byte
-    digits = value[::2].decode("ascii", errors="ignore")
+    decoded = _decode_utf16le(value)
+    digits = "".join(char for char in decoded if char.isdigit())
 
     # Expected DDMMYYYY
     if len(digits) == 8 and digits.isdigit():
-        return f"{digits[4:8]}-{digits[2:4]}-{digits[0:2]}"
+        return format_date_ddmmyyyy(digits)
 
     return ""
 
 def decode_ascii_date(value: bytes) -> str:
     """
-    Expects DDMMYYYY as ASCII, returns DD.MM.YYYY
+    Expects DDMMYYYY as ASCII, returns DD.MM.YYYY.
 
     Parameters:
         value (bytes): Date value
     Returns:
-        str: Formatted date (DD.MM.YYYY) or empty string if failed
+        str: Formatted date (DD.MM.YYYY.) or empty string if failed
     """
     try:
         s = value.decode("ascii").strip()
-        if len(s) == 8:
-            return f"{s[0:2]}.{s[2:4]}.{s[4:8]}"
-    except Exception:
-        pass
+        if len(s) == 8 and s.isdigit():
+            return format_date_ddmmyyyy(s)
+    except UnicodeDecodeError:
+        return ""
     return ""
 
 def _decode_utf16le(value: bytes) -> str:
@@ -91,6 +107,7 @@ def _decode_utf16le(value: bytes) -> str:
     if not value:
         return ""
     try:
-        return value.decode("utf-16le").strip("\x00")
-    except Exception:
+        encoding = "utf-16" if value.startswith((b"\xff\xfe", b"\xfe\xff")) else "utf-16le"
+        return value.decode(encoding).strip("\ufeff\x00 \t\r\n")
+    except (UnicodeDecodeError, ValueError):
         return ""

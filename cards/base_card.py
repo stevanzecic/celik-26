@@ -45,7 +45,7 @@ class BaseCard:
         """
         raise NotImplementedError
 
-    def _select_file(self, fid: bytes, p1=0x00, p2=0x00):
+    def _select_file(self, fid: bytes, p1=0x00, p2=0x00, le=None):
         """
         Select a file on the card.
 
@@ -56,7 +56,7 @@ class BaseCard:
         Returns:
             None
         """
-        apdu = build_apdu(0x00, 0xA4, p1, p2, fid)
+        apdu = build_apdu(0x00, 0xA4, p1, p2, fid, le)
         rsp = self.pcsc.transmit(apdu)
 
         if rsp[-2:] != b"\x90\x00":
@@ -90,6 +90,11 @@ class BaseCard:
             data += chunk
             offset += len(chunk)
 
+        if len(data) != total_len:
+            raise RuntimeError(
+                f"File data truncated: expected {total_len} bytes, got {len(data)}"
+            )
+
         return data
 
     def get_document(self):
@@ -113,4 +118,3 @@ class BaseCard:
             Document: Document (card) data as a document object
         """
         raise NotImplementedError
-
