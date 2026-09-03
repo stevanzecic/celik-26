@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import re
+from gui.i18n import DEFAULT_LANGUAGE, tr
 
 
 PRINT_NOTE = (
@@ -27,7 +28,7 @@ def document_number_for_print(value):
     return match.group(1) if match else value
 
 
-def build_id_print_data(doc, printed_at=None):
+def build_id_print_data(doc, printed_at=None, language=DEFAULT_LANGUAGE):
     """Return normalized plain-text values used by the print renderer."""
     printed_at = printed_at or datetime.now()
     birth_place = ", ".join(
@@ -44,27 +45,27 @@ def build_id_print_data(doc, printed_at=None):
         "document_name": str(doc.document_name or "Lična karta").upper(),
         "portrait": getattr(doc, "portrait", None),
         "citizen_rows": (
-            ("Prezime:", doc.surname),
-            ("Ime:", doc.given_name),
-            ("Ime jednog roditelja:", doc.parent_given_name),
-            ("Datum rođenja:", doc.date_of_birth),
-            ("Mesto rođenja, opština i država:", birth_place),
-            ("Prebivalište i adresa stana:", doc.address()),
-            ("Datum promene adrese:", doc.address_date or "Nije dostupan"),
-            ("JMBG:", doc.personal_number),
-            ("Pol:", doc.sex),
+            (tr("surname", language), doc.surname),
+            (tr("given_name", language), doc.given_name),
+            (tr("parent_name", language), doc.parent_given_name),
+            (tr("birth_date", language), doc.date_of_birth),
+            (tr("birth_place", language), birth_place),
+            (tr("address", language), doc.address()),
+            (tr("address_date", language), doc.address_date or tr("not_available", language)),
+            (tr("jmbg", language), doc.personal_number),
+            (tr("sex", language), doc.sex),
         ),
         "document_rows": (
-            ("Dokument izdaje:", doc.issuing_authority),
-            ("Broj dokumenta:", document_number_for_print(doc.document_serial_number)),
-            ("Datum izdavanja:", doc.issuing_date),
-            ("Važi do:", doc.expiry_date),
+            (tr("authority", language), doc.issuing_authority),
+            (tr("document_number", language), document_number_for_print(doc.document_serial_number)),
+            (tr("issue_date", language), doc.issuing_date),
+            (tr("expiry_date", language), doc.expiry_date),
         ),
         "print_date": printed_at.strftime("%d.%m.%Y."),
     }
 
 
-def _render_id_document(printer, doc):
+def _render_id_document(printer, doc, language=DEFAULT_LANGUAGE):
     """Paint exactly one A4 ID-card page on ``printer``."""
     from PyQt6.QtCore import QLineF, QRectF, Qt
     from PyQt6.QtGui import (
@@ -91,7 +92,7 @@ def _render_id_document(printer, doc):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
 
-        data = build_id_print_data(doc)
+        data = build_id_print_data(doc, language=language)
         black_pen = QPen(Qt.GlobalColor.black)
         black_pen.setWidthF(0.8)
         painter.setPen(black_pen)
@@ -127,7 +128,7 @@ def _render_id_document(printer, doc):
         line(59)
         line(89)
         set_font(10)
-        text(69, 62, 458, 25, f"OČITANI DOKUMENT: {data['document_name']}")
+        text(69, 62, 458, 25, f"{tr('print_document_header', language)}: {data['document_name']}")
 
         # Portrait - drawn directly, with no HTML/table container.
         photo_rect = QRectF(59, 103, 121, 160)
@@ -145,13 +146,13 @@ def _render_id_document(printer, doc):
             painter.drawImage(photo_rect, qimage)
         else:
             set_font(8)
-            text(59, 103, 121, 160, "Fotografija nije dostupna")
+            text(59, 103, 121, 160, tr("photo_missing", language))
 
         # Citizen section
         line(277)
         line(302)
         set_font(9)
-        text(68, 279, 459, 21, "Podaci o građaninu")
+        text(68, 279, 459, 21, tr("print_person", language))
         rows(
             data["citizen_rows"],
             (
@@ -171,7 +172,7 @@ def _render_id_document(printer, doc):
         line(547)
         line(572)
         set_font(9)
-        text(68, 549, 459, 21, "Podaci o dokumentu")
+        text(68, 549, 459, 21, tr("print_document", language))
         rows(
             data["document_rows"],
             ((576, 25), (601, 25), (626, 24), (650, 20)),
@@ -181,18 +182,18 @@ def _render_id_document(printer, doc):
         line(670)
         line(673)
         set_font(9)
-        text(68, 676, 459, 20, f"Datum štampe: {data['print_date']}")
+        text(68, 676, 459, 20, f"{tr('print_date', language)} {data['print_date']}")
 
         line(731)
         line(765)
         set_font(7)
-        text(59, 735, 478, 27, PRINT_NOTE)
+        text(59, 735, 478, 27, PRINT_NOTE if language == "sr" else "The card stores the holder's name in the national script; other data is printed in Latin script.")
     finally:
         painter.end()
 
 
 
-def print_id_document(parent, doc):
+def print_id_document(parent, doc, language=DEFAULT_LANGUAGE):
     """Preview an ID-card printout with a menu bar and let the user print it.
 
     Deliberately built from ``QPrintPreviewWidget`` + a plain ``QMenuBar``
@@ -214,12 +215,12 @@ def print_id_document(parent, doc):
     printer.setFullPage(True)
 
     dialog = QDialog(parent)
-    dialog.setWindowTitle("Pregled štampe lične karte")
+    dialog.setWindowTitle(tr("print_preview", language))
     dialog.resize(1000, 800)
 
     preview_widget = QPrintPreviewWidget(printer, dialog)
     preview_widget.paintRequested.connect(
-        lambda preview_printer: _render_id_document(preview_printer, doc)
+        lambda preview_printer: _render_id_document(preview_printer, doc, language)
     )
 
     def do_print():
@@ -232,35 +233,35 @@ def print_id_document(parent, doc):
 
     menu_bar = QMenuBar(dialog)
 
-    print_action = QAction("Štampaj", dialog)
+    print_action = QAction(tr("print", language), dialog)
     print_action.setShortcut(QKeySequence.StandardKey.Print)
     print_action.triggered.connect(do_print)
     menu_bar.addAction(print_action)
 
-    close_action = QAction("Zatvori", dialog)
+    close_action = QAction(tr("close", language), dialog)
     close_action.setShortcut(QKeySequence.StandardKey.Close)
     close_action.triggered.connect(dialog.reject)
     menu_bar.addAction(close_action)
 
-    view_menu = menu_bar.addMenu("Prikaz")
+    view_menu = menu_bar.addMenu(tr("view", language))
 
-    zoom_in_action = QAction("Uvećaj", dialog)
+    zoom_in_action = QAction(tr("zoom_in", language), dialog)
     zoom_in_action.setShortcut(QKeySequence.StandardKey.ZoomIn)
     zoom_in_action.triggered.connect(preview_widget.zoomIn)
     view_menu.addAction(zoom_in_action)
 
-    zoom_out_action = QAction("Umanji", dialog)
+    zoom_out_action = QAction(tr("zoom_out", language), dialog)
     zoom_out_action.setShortcut(QKeySequence.StandardKey.ZoomOut)
     zoom_out_action.triggered.connect(preview_widget.zoomOut)
     view_menu.addAction(zoom_out_action)
 
     view_menu.addSeparator()
 
-    fit_width_action = QAction("Prilagodi širini", dialog)
+    fit_width_action = QAction(tr("fit_width", language), dialog)
     fit_width_action.triggered.connect(preview_widget.fitToWidth)
     view_menu.addAction(fit_width_action)
 
-    fit_page_action = QAction("Prilagodi strani", dialog)
+    fit_page_action = QAction(tr("fit_page", language), dialog)
     fit_page_action.triggered.connect(preview_widget.fitInView)
     view_menu.addAction(fit_page_action)
 

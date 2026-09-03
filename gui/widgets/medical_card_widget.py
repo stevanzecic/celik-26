@@ -6,6 +6,7 @@ from PyQt6.QtCore import pyqtSignal
 import threading
 
 from gui.widgets.label_row import LabelRow
+from gui.i18n import DEFAULT_LANGUAGE, tr
 
 
 class MedicalCardWidget(QWidget):
@@ -13,6 +14,8 @@ class MedicalCardWidget(QWidget):
 
     def __init__(self):
         super().__init__()
+
+        self.language = DEFAULT_LANGUAGE
 
         self._doc = None
         self._rfzo_in_progress = False
@@ -33,44 +36,27 @@ class MedicalCardWidget(QWidget):
         # ---------------- Rows ----------------
         self.rows = {
             # Person
-            "given": LabelRow("Ime:"),
-            "parent": LabelRow("Ime jednog roditelja:"),
-            "family": LabelRow("Prezime:"),
-            "birth": LabelRow("Datum rođenja:"),
-            "place": LabelRow("Mesto, opština i država:"),
-            "street": LabelRow("Ulica:"),
-            "gender": LabelRow("Pol:"),
-            "language": LabelRow("Jezik:"),
-            "lbo": LabelRow("LBO:"),
-            "jmbg": LabelRow("JMBG:"),
+            "given": LabelRow(), "parent": LabelRow(), "family": LabelRow(), "birth": LabelRow(),
+            "place": LabelRow(), "street": LabelRow(), "gender": LabelRow(), "language": LabelRow(),
+            "lbo": LabelRow(), "jmbg": LabelRow(),
 
             # Card
-            "issue": LabelRow("Datum izdavanja:"),
-            "expiry": LabelRow("Datum važenja:"),
-            "valid": LabelRow("Overena do:"),
-            "permanent": LabelRow("Trajno overena:"),
+            "issue": LabelRow(), "expiry": LabelRow(), "valid": LabelRow(), "permanent": LabelRow(),
 
             # Carrier
-            "carrier_name": LabelRow("Nosilac osiguranja:"),
-            "carrier_lbo": LabelRow("LBO nosioca:"),
-            "carrier_jmbg": LabelRow("JMBG nosioca:"),
-            "carrier_relation": LabelRow("Srodstvo:"),
+            "carrier_name": LabelRow(), "carrier_lbo": LabelRow(), "carrier_jmbg": LabelRow(), "carrier_relation": LabelRow(),
 
             # Insurance
-            "insurance_basis": LabelRow("Osnov osiguranja:"),
-            "insurance_start": LabelRow("Početak osiguranja:"),
-            "insurance_desc": LabelRow("Opis osiguranja:"),
+            "insurance_basis": LabelRow(), "insurance_start": LabelRow(), "insurance_desc": LabelRow(),
 
             # Taxpayer
-            "taxpayer_name": LabelRow("Naziv obveznika:"),
-            "taxpayer_res": LabelRow("Sedište:"),
-            "taxpayer_no": LabelRow("Registarski broj:"),
-            "taxpayer_id": LabelRow("PIB / JMBG:"),
-            "taxpayer_act": LabelRow("Delatnost:"),
+            "taxpayer_name": LabelRow(), "taxpayer_res": LabelRow(), "taxpayer_no": LabelRow(),
+            "taxpayer_id": LabelRow(), "taxpayer_act": LabelRow(),
         }
 
         # ---------------- Layout ----------------
-        layout.addWidget(self._section("Opšti podaci o osiguraniku"))
+        self.sections = {}
+        layout.addWidget(self._section("medical_general"))
         for k in (
             "given", "parent", "family", "birth",
             "place", "street", "gender",
@@ -78,18 +64,18 @@ class MedicalCardWidget(QWidget):
         ):
             layout.addWidget(self.rows[k])
 
-        layout.addWidget(self._section("Podaci o kartici zdravstvenog osiguranja"))
+        layout.addWidget(self._section("medical_card"))
         for k in ("issue", "expiry", "valid", "permanent"):
             layout.addWidget(self.rows[k])
 
-        layout.addWidget(self._section("Podaci o nosiocu osiguranja"))
+        layout.addWidget(self._section("medical_carrier"))
         for k in (
             "carrier_name", "carrier_lbo",
             "carrier_jmbg", "carrier_relation"
         ):
             layout.addWidget(self.rows[k])
 
-        layout.addWidget(self._section("Podaci o osiguranju"))
+        layout.addWidget(self._section("medical_insurance"))
         for k in (
             "insurance_basis",
             "insurance_start",
@@ -97,7 +83,7 @@ class MedicalCardWidget(QWidget):
         ):
             layout.addWidget(self.rows[k])
 
-        layout.addWidget(self._section("Podaci o obvezniku"))
+        layout.addWidget(self._section("medical_taxpayer"))
         for k in (
             "taxpayer_name", "taxpayer_res",
             "taxpayer_no", "taxpayer_id",
@@ -106,7 +92,7 @@ class MedicalCardWidget(QWidget):
             layout.addWidget(self.rows[k])
 
         # ---------------- RFZO ----------------
-        self.rfzo_btn = QPushButton("Proveri važenje preko RFZO")
+        self.rfzo_btn = QPushButton()
         self.rfzo_btn.clicked.connect(self._update_rfzo)
         layout.addWidget(self.rfzo_btn)
 
@@ -115,6 +101,7 @@ class MedicalCardWidget(QWidget):
 
         main = QVBoxLayout(self)
         main.addWidget(scroll)
+        self.set_language(self.language)
 
     # =====================================================
     # Data binding
@@ -123,7 +110,7 @@ class MedicalCardWidget(QWidget):
     def set_data(self, doc):
         if doc is not self._doc:
             self._rfzo_in_progress = False
-            self.rfzo_btn.setText("Proveri važenje preko RFZO")
+            self.rfzo_btn.setText(tr("rfzo", self.language))
         self._doc = doc
 
         self.title.setText(doc.full_name_latin())
@@ -146,7 +133,7 @@ class MedicalCardWidget(QWidget):
         self.rows["issue"].set_value(doc.date_of_issue)
         self.rows["expiry"].set_value(doc.date_of_expiry)
         self.rows["valid"].set_value(doc.valid_until)
-        self.rows["permanent"].set_value("Da" if doc.permanently_valid else "Ne")
+        self.rows["permanent"].set_value(tr("yes" if doc.permanently_valid else "no", self.language))
 
         # Optional sections
         self._opt(
@@ -177,7 +164,7 @@ class MedicalCardWidget(QWidget):
         self._doc = None
         self._rfzo_in_progress = False
         self.title.clear()
-        self.rfzo_btn.setText("Proveri važenje preko RFZO")
+        self.rfzo_btn.setText(tr("rfzo", self.language))
         self.rfzo_btn.setEnabled(False)
         for row in self.rows.values():
             row.set_value("")
@@ -192,8 +179,8 @@ class MedicalCardWidget(QWidget):
 
         self._rfzo_in_progress = True
         self.rfzo_btn.setEnabled(False)
-        self.rfzo_btn.setText("Provera u toku...")
-        self.rows["valid"].set_value("Provera u toku...")
+        self.rfzo_btn.setText(tr("rfzo_progress", self.language))
+        self.rows["valid"].set_value(tr("rfzo_progress", self.language))
 
         document = self._doc
 
@@ -214,20 +201,39 @@ class MedicalCardWidget(QWidget):
 
         self._rfzo_in_progress = False
         self.rfzo_btn.setEnabled(True)
-        self.rfzo_btn.setText("Proveri važenje preko RFZO")
+        self.rfzo_btn.setText(tr("rfzo", self.language))
 
         if error:
-            QMessageBox.warning(self, "RFZO", error)
+            QMessageBox.warning(self, tr("rfzo_error_title", self.language), error)
         self.rows["valid"].set_value(document.valid_until)
 
     # =====================================================
     # Helpers
     # =====================================================
 
-    def _section(self, title):
-        lbl = QLabel(title)
+    def _section(self, key):
+        lbl = QLabel(tr(key, self.language))
         lbl.setStyleSheet("font-weight: bold; margin-top: 14px;")
+        self.sections[key] = lbl
         return lbl
+
+    def set_language(self, language):
+        self.language = language
+        labels = {
+            "given": "given_name", "parent": "parent_name", "family": "surname", "birth": "birth_date",
+            "place": "place", "street": "street", "gender": "gender", "language": "medical_language", "lbo": "lbo", "jmbg": "jmbg",
+            "issue": "medical_issue", "expiry": "medical_expiry", "valid": "valid", "permanent": "permanent",
+            "carrier_name": "carrier_name", "carrier_lbo": "carrier_lbo", "carrier_jmbg": "carrier_jmbg", "carrier_relation": "carrier_relation",
+            "insurance_basis": "insurance_basis", "insurance_start": "insurance_start", "insurance_desc": "insurance_desc",
+            "taxpayer_name": "taxpayer_name", "taxpayer_res": "taxpayer_res", "taxpayer_no": "taxpayer_no", "taxpayer_id": "taxpayer_id", "taxpayer_act": "taxpayer_act",
+        }
+        for key, text_key in labels.items():
+            self.rows[key].set_label(tr(text_key, language))
+        for key, label in self.sections.items():
+            label.setText(tr(key, language))
+        self.rfzo_btn.setText(tr("rfzo", language))
+        if self._doc is not None:
+            self.set_data(self._doc)
 
     def _opt(self, key, value):
         row = self.rows[key]

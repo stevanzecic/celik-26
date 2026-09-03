@@ -4,7 +4,7 @@
   <img src="./assets/img/celik-26-logo-nbg.png" width="45%" alt="celik-26-logo">
 </p>
 
-`v0.1.2`
+`v0.1.3`
 
 </div>
 
@@ -30,10 +30,14 @@
   - [RFZO verification](#rfzo-verification)
   - [Privacy](#privacy)
 - [CHANGELOG](#changelog)
-  - [v0.1.2](#v012)
+  - [v0.1.3](#v013)
     - [Added](#added)
     - [Improved](#improved)
     - [Fixed](#fixed)
+  - [v0.1.2](#v012)
+    - [Added](#added-1)
+    - [Improved](#improved-1)
+    - [Fixed](#fixed-1)
     - [Removed](#removed)
   - [v0.1.1](#v011)
   - [v0.1.0](#v010)
@@ -68,6 +72,7 @@ celik-26/
 |
 ├── gui/
 │   ├── settings/
+│   ├── translations/
 │   ├── widgets/
 │   ├── workers/
 │   ├── app.py
@@ -90,7 +95,9 @@ celik-26/
 ├── tests/
 │   ├── test_cards.py
 │   ├── test_core.py
-│   └── test_documents.py
+│   ├── test_documents.py
+│   ├── test_i18n.py
+│   └── test_printing.py
 │
 ├── .gitignore
 ├── card_reader_cli.py
@@ -111,6 +118,7 @@ celik-26/
 - Full identity-card and medical-card data views, including portrait display
 - A4 identity-card printing through the native system print dialog
 - Optional on-demand RFZO insurance-validity lookup for medical cards
+- Serbian and English interface translations, configurable under Preferences
 
 ### 🧩 Supported Cards
 
@@ -280,11 +288,40 @@ the inserted card. The application does not upload card data during normal
 reading or printing. The only external request is the explicit RFZO validity
 check described above, which sends the KZO and LBO values required by RFZO.
 
+### Language
+
+The interface starts in Serbian. Open **Settings → Preferences**, choose
+**English** or **Srpski**, and select **Save**; the open window and card views
+are updated immediately. The selected language is remembered for the next run.
+Translation resources are stored in `gui/translations/sr.json` and
+`gui/translations/en.json`. They are loaded at startup without any additional
+translation toolchain.
+
 [Back to top](#top)
 
 ---
 
 ## CHANGELOG
+
+### v0.1.3
+
+#### Added
+
+- Added Serbian and English interface translations
+- Added a language selector under **Settings → Preferences**
+- Added persistent language selection using application settings
+- Added JSON translation resources in `gui/translations/`
+
+#### Improved
+
+- Centralized UI translation lookup and fallback behavior
+- Updated card views, menus, dialogs, status messages, and print preview for both languages
+
+#### Fixed
+
+- Fixed medical-card view startup failure caused by translation-aware `LabelRow` construction
+
+---
 
 ### v0.1.2
 

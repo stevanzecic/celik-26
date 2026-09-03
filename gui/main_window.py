@@ -8,7 +8,7 @@ from PyQt6.QtWidgets import (
     QLabel, QPushButton, QMessageBox,
     QMenu, QStatusBar
 )
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSettings
 
 from qt_material import apply_stylesheet
 
@@ -19,6 +19,7 @@ from card_reader_cli import get_readers_list
 from gui.widgets.id_card_widget import IdCardWidget
 from gui.widgets.medical_card_widget import MedicalCardWidget
 from gui.id_card_printer import print_id_document
+from gui.i18n import DEFAULT_LANGUAGE, tr
 
 
 class MainWindow(QMainWindow):
@@ -31,16 +32,18 @@ class MainWindow(QMainWindow):
         self.reader_name = None
         self.card_data = None
         self.manual_mode = False
+        self.language = QSettings("CELIK-26", "CardReader").value("language", DEFAULT_LANGUAGE)
 
         self._build_ui()
         self._build_menu()
+        self.apply_language(self.language)
         self._start_worker()
 
     def _build_ui(self):
         central = QWidget()
         layout = QVBoxLayout(central)
 
-        self.info_label = QLabel("No reader connected.")
+        self.info_label = QLabel(tr("no_reader", self.language))
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label.setStyleSheet("font-size: 16px;")
         layout.addWidget(self.info_label)
@@ -48,7 +51,7 @@ class MainWindow(QMainWindow):
         # -------- Card display --------
         self.card_stack = QStackedWidget()
 
-        self.empty_label = QLabel("Insert a card to view data.")
+        self.empty_label = QLabel(tr("insert_card", self.language))
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         self.id_widget = IdCardWidget()
@@ -64,18 +67,18 @@ class MainWindow(QMainWindow):
 
         self.button_layout = QHBoxLayout()
 
-        self.read_btn = QPushButton("Read Card")
+        self.read_btn = QPushButton(tr("read_card", self.language))
         self.read_btn.setEnabled(False)
-        self.read_btn.setToolTip("No reader connected")
+        self.read_btn.setToolTip(tr("no_reader_short", self.language))
         self.read_btn.clicked.connect(self.manual_read)
 
-        self.save_btn = QPushButton("Save")
+        self.save_btn = QPushButton(tr("save", self.language))
         self.save_btn.setEnabled(False)
-        self.save_btn.setToolTip("Saving is not implemented yet")
+        self.save_btn.setToolTip(tr("save_unimplemented", self.language))
 
-        self.print_btn = QPushButton("Print")
+        self.print_btn = QPushButton(tr("print", self.language))
         self.print_btn.setEnabled(False)
-        self.print_btn.setToolTip("Read an ID card before printing")
+        self.print_btn.setToolTip(tr("read_id_before_print", self.language))
         self.print_btn.clicked.connect(self.print_current_card)
 
         self.button_layout.addStretch(1)
@@ -101,7 +104,7 @@ class MainWindow(QMainWindow):
                 background-color: #aa0000;
             }
         """)
-        self.reader_icon.setToolTip("No reader connected")
+        self.reader_icon.setToolTip(tr("no_reader_short", self.language))
         self.status.addPermanentWidget(self.reader_icon)
 
         # -------- Blink timer --------
@@ -112,16 +115,16 @@ class MainWindow(QMainWindow):
 
         # -------- Initial state --------
         self.set_reader_status("no_reader")
-        self.status.showMessage("No reader connected")
+        self.status.showMessage(tr("no_reader", self.language))
 
     def _build_menu(self):
         menubar = self.menuBar()
 
-        self.reader_menu = QMenu("Reader Selection", self)
-        self.refresh_action = self.reader_menu.addAction("Refresh")
+        self.reader_menu = QMenu(tr("reader_selection", self.language), self)
+        self.refresh_action = self.reader_menu.addAction(tr("refresh", self.language))
         self.refresh_action.triggered.connect(self.refresh_readers)
 
-        self.auto_action = self.reader_menu.addAction("Auto Select")
+        self.auto_action = self.reader_menu.addAction(tr("auto_select", self.language))
         self.auto_action.setCheckable(True)
         self.auto_action.setChecked(True)
         self.auto_action.triggered.connect(self.enable_auto_mode)
@@ -129,10 +132,10 @@ class MainWindow(QMainWindow):
 
         menubar.addMenu(self.reader_menu)
 
-        settings_menu = QMenu("Settings", self)
-        pref_action = settings_menu.addAction("Preferences")
-        pref_action.triggered.connect(self.open_settings)
-        menubar.addMenu(settings_menu)
+        self.settings_menu = QMenu(tr("settings", self.language), self)
+        self.pref_action = self.settings_menu.addAction(tr("preferences", self.language))
+        self.pref_action.triggered.connect(self.open_settings)
+        menubar.addMenu(self.settings_menu)
 
     def _start_worker(self):
         self.worker = ReaderWorker()
@@ -169,7 +172,7 @@ class MainWindow(QMainWindow):
         self.auto_action.setChecked(False)
 
         self.worker.set_manual_reader(reader_name)
-        self.status.showMessage(f"Manually selected reader: {reader_name}")
+        self.status.showMessage(tr("manual_reader", self.language, name=reader_name))
 
         self.refresh_readers()
 
@@ -178,13 +181,14 @@ class MainWindow(QMainWindow):
         self.auto_action.setChecked(True)
 
         self.worker.set_manual_reader(None)
-        self.status.showMessage("Reader selection set to AUTO")
+        self.status.showMessage(tr("auto_reader", self.language))
 
         self.refresh_readers()
 
     def open_settings(self):
         dlg = SettingsWindow(self)
         dlg.theme_changed.connect(self.apply_theme)
+        dlg.language_changed.connect(self.apply_language)
         dlg.exec()
 
     # ---------- Reader status and icon ----------
@@ -216,17 +220,17 @@ class MainWindow(QMainWindow):
         if state == "no_reader":
             self._stop_blinking()
             color = "#aa0000"   # red
-            tooltip = "No reader connected"
+            tooltip = tr("no_reader_short", self.language)
 
         elif state == "no_card":
             color = "#e6b800"   # base yellow (bright)
-            tooltip = "Reader connected, waiting for card"
+            tooltip = tr("connected_insert", self.language)
             self._start_blinking()
 
         elif state == "card_ok":
             self._stop_blinking()
             color = "#00aa00"   # green
-            tooltip = "Card read successfully"
+            tooltip = tr("card_success", self.language)
 
         else:
             return
@@ -247,8 +251,8 @@ class MainWindow(QMainWindow):
         self.read_btn.setEnabled(True)
         self.read_btn.setToolTip("")
 
-        self.info_label.setText("Reader connected. Insert card.")
-        self.status.showMessage(f"Connected to reader: {reader_name}")
+        self.info_label.setText(tr("connected_insert", self.language))
+        self.status.showMessage(tr("connected_reader", self.language, name=reader_name))
 
         self.refresh_readers()
 
@@ -257,10 +261,10 @@ class MainWindow(QMainWindow):
         self._clear_card_data()
 
         self.read_btn.setEnabled(False)
-        self.read_btn.setToolTip("No reader connected")
+        self.read_btn.setToolTip(tr("no_reader_short", self.language))
 
-        self.info_label.setText("No reader connected.")
-        self.status.showMessage("No reader connected")
+        self.info_label.setText(tr("no_reader", self.language))
+        self.status.showMessage(tr("no_reader", self.language))
 
         self.set_reader_status("no_reader")
         self.refresh_readers()
@@ -273,19 +277,19 @@ class MainWindow(QMainWindow):
             self.card_stack.setCurrentWidget(self.id_widget)
             self.print_btn.setEnabled(True)
             self.print_btn.setToolTip("")
-            label = "ID card read successfully"
+            label = tr("id_success", self.language)
 
         elif data["type"] == "MED":
             self.med_widget.set_data(data["data"])
             self.card_stack.setCurrentWidget(self.med_widget)
             self.print_btn.setEnabled(False)
-            self.print_btn.setToolTip("Printing medical cards is not implemented yet")
-            label = "Medical card read successfully"
+            self.print_btn.setToolTip(tr("print_medical", self.language))
+            label = tr("medical_success", self.language)
 
         else:
             self.print_btn.setEnabled(False)
-            self.print_btn.setToolTip("Read an ID card before printing")
-            label = "Card read successfully"
+            self.print_btn.setToolTip(tr("read_id_before_print", self.language))
+            label = tr("card_success", self.language)
 
         # Update top label
         self.info_label.setText(label)
@@ -297,7 +301,7 @@ class MainWindow(QMainWindow):
         self.set_reader_status("card_ok")
 
     def on_card_failed(self, msg):
-        self.info_label.setText("Failed to read card. Retrying...")
+        self.info_label.setText(tr("failed_retry", self.language))
         self.status.showMessage(msg)
         self.save_btn.setEnabled(False)
         self.print_btn.setEnabled(False)
@@ -306,8 +310,8 @@ class MainWindow(QMainWindow):
     def on_no_card(self):
         self._clear_card_data()
 
-        self.info_label.setText("Reader connected. Insert card.")
-        self.status.showMessage("No card in reader")
+        self.info_label.setText(tr("connected_insert", self.language))
+        self.status.showMessage(tr("no_card", self.language))
 
         self.save_btn.setEnabled(False)
         self.print_btn.setEnabled(False)
@@ -316,8 +320,8 @@ class MainWindow(QMainWindow):
 
     def on_read_started(self):
         self._clear_card_data()
-        self.info_label.setText("Reading card...")
-        self.status.showMessage("Reading card...")
+        self.info_label.setText(tr("reading", self.language))
+        self.status.showMessage(tr("reading", self.language))
         self.save_btn.setEnabled(False)
         self.print_btn.setEnabled(False)
         self.set_reader_status("no_card")  # yellow (blinking)
@@ -325,7 +329,7 @@ class MainWindow(QMainWindow):
     def _clear_card_data(self):
         self.card_data = None
         self.print_btn.setEnabled(False)
-        self.print_btn.setToolTip("Read an ID card before printing")
+        self.print_btn.setToolTip(tr("read_id_before_print", self.language))
         self.id_widget.clear_data()
         self.med_widget.clear_data()
         self.card_stack.setCurrentWidget(self.empty_label)
@@ -334,43 +338,45 @@ class MainWindow(QMainWindow):
         if not self.card_data or self.card_data.get("type") != "ID":
             QMessageBox.information(
                 self,
-                "Print",
-                "Read an ID card before printing.",
+                tr("read_before_print_title", self.language),
+                tr("read_before_print_msg", self.language),
             )
             return
 
         try:
-            printed = print_id_document(self, self.card_data["data"])
+            printed = print_id_document(
+                self, self.card_data["data"], language=self.language
+            )
         except Exception as error:
             QMessageBox.critical(
                 self,
-                "Print failed",
-                f"Could not print the ID card:\n{error}",
+                tr("print_failed", self.language),
+                tr("could_not_print", self.language, error=error),
             )
-            self.status.showMessage("ID card printing failed")
+            self.status.showMessage(tr("print_failed", self.language))
             return
 
         if printed:
-            self.status.showMessage("ID card sent to printer")
+            self.status.showMessage(tr("sent_printer", self.language))
 
     def manual_read(self):
         if not self.reader_name:
             QMessageBox.information(
                 self,
-                "No reader",
-                "No reader connected."
+                tr("no_reader_title", self.language),
+                tr("no_reader_msg", self.language)
             )
             return
 
         if not self.worker.is_card_connected():
             QMessageBox.information(
                 self,
-                "No card",
-                "Insert a card before reading."
+                tr("no_card_title", self.language),
+                tr("no_card_msg", self.language)
             )
             return
 
-        self.status.showMessage("Manual read triggered...")
+        self.status.showMessage(tr("manual_triggered", self.language))
         if not self.worker.force_read():
             self.on_no_card()
 
@@ -381,13 +387,54 @@ class MainWindow(QMainWindow):
             event.ignore()
             QMessageBox.warning(
                 self,
-                "Reader busy",
-                "The card reader is still finishing an operation. Try closing again.",
+                tr("reader_busy", self.language),
+                tr("reader_busy_msg", self.language),
             )
             return
         event.accept()
 
     # ---------- Theme management ----------
+
+    def apply_language(self, language: str):
+        """Apply a language to the window and all currently visible widgets."""
+        self.language = language if language in ("sr", "en") else DEFAULT_LANGUAGE
+        self.read_btn.setText(tr("read_card", self.language))
+        self.save_btn.setText(tr("save", self.language))
+        self.print_btn.setText(tr("print", self.language))
+        self.empty_label.setText(tr("insert_card", self.language))
+        self.read_btn.setToolTip(
+            "" if self.reader_name else tr("no_reader_short", self.language)
+        )
+        self.save_btn.setToolTip(tr("save_unimplemented", self.language))
+        self.print_btn.setToolTip(
+            tr("print_medical", self.language)
+            if self.card_data and self.card_data.get("type") == "MED"
+            else tr("read_id_before_print", self.language)
+        )
+        self.reader_menu.setTitle(tr("reader_selection", self.language))
+        self.refresh_action.setText(tr("refresh", self.language))
+        self.auto_action.setText(tr("auto_select", self.language))
+        self.settings_menu.setTitle(tr("settings", self.language))
+        self.pref_action.setText(tr("preferences", self.language))
+        self.id_widget.set_language(self.language)
+        self.med_widget.set_language(self.language)
+        if self.card_data:
+            current_label = (
+                "id_success" if self.card_data.get("type") == "ID"
+                else "medical_success" if self.card_data.get("type") == "MED"
+                else "card_success"
+            )
+            self.info_label.setText(tr(current_label, self.language))
+            self.status.showMessage(tr(current_label, self.language))
+        elif self.reader_name:
+            self.info_label.setText(tr("connected_insert", self.language))
+            self.status.showMessage(tr("connected_insert", self.language))
+        else:
+            self.info_label.setText(tr("no_reader", self.language))
+            self.status.showMessage(tr("no_reader", self.language))
+        self.set_reader_status(
+            "card_ok" if self.card_data else "no_card" if self.reader_name else "no_reader"
+        )
 
     def apply_theme(self, theme_name: str):
         """
@@ -408,4 +455,6 @@ class MainWindow(QMainWindow):
             # Simple auto logic: default to dark
             apply_stylesheet(app, theme="dark_teal.xml")
 
-        self.status.showMessage(f"Theme changed to {theme_name}")
+        self.status.showMessage(
+            tr("theme_changed", self.language, theme=tr(theme_name, self.language))
+        )

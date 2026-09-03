@@ -10,6 +10,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from gui.i18n import DEFAULT_LANGUAGE, tr
 
 
 class IdCardWidget(QWidget):
@@ -17,6 +18,9 @@ class IdCardWidget(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.language = DEFAULT_LANGUAGE
+        self._doc = None
+        self._field_labels = []
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -32,10 +36,12 @@ class IdCardWidget(QWidget):
         content = QHBoxLayout()
         content.setSpacing(14)
         content.addLayout(self._build_photo_column())
-        content.addWidget(self._build_person_group(), 1)
+        self.person_group = self._build_person_group()
+        content.addWidget(self.person_group, 1)
         root.addLayout(content)
 
-        root.addWidget(self._build_document_group())
+        self.document_group = self._build_document_group()
+        root.addWidget(self.document_group)
         self.additional_group = self._build_additional_group()
         self.additional_group.hide()
         root.addWidget(self.additional_group)
@@ -47,6 +53,7 @@ class IdCardWidget(QWidget):
         layout.addWidget(scroll)
 
         self.clear_data()
+        self.set_language(self.language)
 
     def _build_header(self):
         header = QFrame()
@@ -55,10 +62,10 @@ class IdCardWidget(QWidget):
         layout.setContentsMargins(14, 9, 14, 9)
         layout.setSpacing(1)
 
-        self.country_title = QLabel("Republika Srbija · Republic of Serbia")
+        self.country_title = QLabel()
         self.country_title.setStyleSheet("font-size: 14px; font-weight: 600;")
 
-        self.document_title = QLabel("LIČNA KARTA · IDENTITY CARD")
+        self.document_title = QLabel()
         self.document_title.setStyleSheet("font-size: 18px; font-weight: 700;")
 
         layout.addWidget(self.country_title)
@@ -69,7 +76,7 @@ class IdCardWidget(QWidget):
         layout = QVBoxLayout()
         layout.setSpacing(6)
 
-        self.photo = QLabel("Fotografija nije dostupna")
+        self.photo = QLabel()
         self.photo.setFixedSize(225, 285)
         self.photo.setFrameShape(QFrame.Shape.StyledPanel)
         self.photo.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -78,7 +85,8 @@ class IdCardWidget(QWidget):
             "QLabel { padding: 4px; background: palette(base); color: palette(mid); }"
         )
 
-        caption = QLabel("Fotografija sa čipa")
+        self.photo_caption = QLabel(tr("photo_chip", self.language))
+        caption = self.photo_caption
         caption.setAlignment(Qt.AlignmentFlag.AlignCenter)
         caption.setStyleSheet("font-size: 11px; color: palette(mid);")
 
@@ -184,9 +192,19 @@ class IdCardWidget(QWidget):
         grid.addWidget(value, row, 1, 1, 3)
         return row + 1
 
-    @staticmethod
-    def _field_label(text):
-        label = QLabel(text)
+    def _field_label(self, text):
+        keys = {
+            "Prezime:": "surname", "Ime:": "given_name", "Ime jednog roditelja:": "parent_name",
+            "Datum rođenja:": "birth_date", "Mesto rođenja, opština i država:": "birth_place",
+            "Prebivalište i adresa stana:": "address", "Datum promene adrese:": "address_date", "JMBG:": "jmbg",
+            "Pol:": "sex", "Državljanstvo:": "nationality", "Dokument izdaje:": "authority", "Broj dokumenta:": "document_number",
+            "Datum izdavanja:": "issue_date", "Važi do:": "expiry_date", "Vrsta dokumenta:": "document_type",
+            "Naziv dokumenta:": "document_name", "Registarski broj:": "registration_number", "Serijski broj čipa:": "chip_number",
+            "Oznaka adrese:": "address_label", "Svrha boravka:": "purpose_of_stay", "Elektronska napomena:": "electronic_note",
+        }
+        key = keys.get(text, text)
+        label = QLabel(tr(key, self.language))
+        self._field_labels.append((key, label))
         label.setStyleSheet("font-weight: 600;")
         label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         return label
@@ -234,6 +252,7 @@ class IdCardWidget(QWidget):
         )
 
     def set_data(self, doc):
+        self._doc = doc
         self._set_value("surname", doc.surname)
         self._set_value("given_name", doc.given_name)
         self._set_value("parent_name", doc.parent_given_name)
@@ -247,7 +266,7 @@ class IdCardWidget(QWidget):
             ),
         )
         self._set_value("address", doc.address())
-        self._set_value("address_date", doc.address_date or "Nije dostupan")
+        self._set_value("address_date", doc.address_date or tr("not_available", self.language))
         self._set_value("jmbg", doc.personal_number)
         self._set_value("sex", doc.sex)
         self._set_value("nationality", doc.nationality_full)
@@ -273,21 +292,42 @@ class IdCardWidget(QWidget):
 
         self.additional_group.setVisible(any(additional.values()))
 
-        title = (doc.document_name or "").strip() or "LIČNA KARTA"
-        self.document_title.setText(f"{title.upper()} · IDENTITY CARD")
+        title = (doc.document_name or "").strip()
+        translated_title = tr("id_title", self.language)
+        if not title or title.upper() == "LIČNA KARTA":
+            title = translated_title
+            self.document_title.setText(title)
+        else:
+            self.document_title.setText(f"{title.upper()} · {translated_title}")
 
         self.photo.clear()
         portrait = getattr(doc, "portrait", None)
         if portrait:
             self.photo.setPixmap(self._pil_to_pixmap(portrait))
         else:
-            self.photo.setText("Fotografija nije dostupna")
+            self.photo.setText(tr("photo_missing", self.language))
 
     def clear_data(self):
         if hasattr(self, "rows"):
             for value in self.rows.values():
                 value.clear()
-        self.document_title.setText("LIČNA KARTA · IDENTITY CARD")
+        self._doc = None
+        self.document_title.setText(tr("id_title", self.language))
         self.photo.clear()
-        self.photo.setText("Fotografija nije dostupna")
+        self.photo.setText(tr("photo_missing", self.language))
         self.additional_group.hide()
+
+    def set_language(self, language):
+        self.language = language
+        self.country_title.setText(tr("id_country", language))
+        self.person_group.setTitle(tr("person", language))
+        self.document_group.setTitle(tr("document", language))
+        self.additional_group.setTitle(tr("additional", language))
+        self.photo_caption.setText(tr("photo_chip", language))
+        for key, label in self._field_labels:
+            label.setText(tr(key, language))
+        if self._doc is not None:
+            self.set_data(self._doc)
+        else:
+            self.document_title.setText(tr("id_title", language))
+            self.photo.setText(tr("photo_missing", language))

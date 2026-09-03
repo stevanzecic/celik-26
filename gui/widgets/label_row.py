@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import QWidget, QHBoxLayout, QLabel
 from PyQt6.QtCore import Qt
 
 class LabelRow(QWidget):
-    def __init__(self, label: str, value: str = ""):
+    def __init__(self, label: str = "", value: str = ""):
         super().__init__()
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 2, 0, 2)
@@ -22,6 +22,9 @@ class LabelRow(QWidget):
 
     def set_value(self, value: str):
         self.value.setText(value or "")
+
+    def set_label(self, label: str):
+        self.label.setText(label)
 
     def set_optional_value(self, value):
         if value:
