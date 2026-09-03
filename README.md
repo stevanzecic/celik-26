@@ -25,6 +25,7 @@
 - [RUNNING CELIK-26](#running-celik-26)
   - [From source](#from-source)
   - [Tests](#tests)
+  - [Builds and releases](#builds-and-releases)
 - [USAGE NOTES](#usage-notes)
   - [Printing](#printing)
   - [RFZO verification](#rfzo-verification)
@@ -247,6 +248,16 @@ reader or personal card data:
 python3 -m unittest discover -v
 ```
 
+### Builds and releases
+
+GitHub Actions builds native Windows, macOS, and Linux executables. Pushing a
+tag beginning with `v` (for example, `v0.1.3`) runs the test suite, packages
+all three platforms, and publishes a GitHub release with the archives attached.
+
+The workflow can also be started manually from the **Actions** tab. Enter any
+branch or tag in the `ref` field for a build-only run, or provide `release_tag`
+to publish those artifacts as a release.
+
 **Dependencies**
 
 - Python 3.10+
@@ -311,6 +322,7 @@ translation toolchain.
 - Added a language selector under **Settings → Preferences**
 - Added persistent language selection using application settings
 - Added JSON translation resources in `gui/translations/`
+- Added GitHub Actions builds and cross-platform release packaging
 
 #### Improved
 
