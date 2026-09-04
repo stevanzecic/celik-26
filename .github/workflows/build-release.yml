@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Check out selected ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
@@ -47,12 +47,8 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libpcsclite-dev swig
 
-      - name: Install macOS smart-card build dependencies
-        if: runner.os == 'macOS'
-        run: brew install pkg-config pcsc-lite
-
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -67,7 +63,7 @@ jobs:
       - name: Build executable
         shell: bash
         run: >-
-          pyinstaller --clean --noconfirm --onefile --windowed
+          python -m PyInstaller --clean --noconfirm --onefile --windowed
           --name "CELIK-26-${{ runner.os }}"
           --add-data "assets${{ matrix.separator }}assets"
           --add-data "gui/translations${{ matrix.separator }}gui/translations"
@@ -81,7 +77,15 @@ jobs:
 
       - name: Archive Unix executable
         if: runner.os != 'Windows'
-        run: tar -czf "CELIK-26-${{ runner.os }}.tar.gz" -C dist "CELIK-26-${{ runner.os }}"
+        shell: bash
+        run: |
+          set -euxo pipefail
+          artifact="CELIK-26-${RUNNER_OS}"
+          if [ "$RUNNER_OS" = "macOS" ] && [ -d "dist/${artifact}.app" ]; then
+            tar -czf "${artifact}.tar.gz" -C dist "${artifact}.app"
+          else
+            tar -czf "${artifact}.tar.gz" -C dist "${artifact}"
+          fi
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -97,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out selected ref
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 

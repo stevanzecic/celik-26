@@ -44,7 +44,7 @@ class IdCardPrintingTests(unittest.TestCase):
         self.assertEqual(data["document_name"], "TEST DOCUMENT NAME")
         self.assertEqual(data["print_date"], "01.09.2026.")
         self.assertIn(("Prezime:", "TEST_SURNAME"), data["citizen_rows"])
-        self.assertIn(("Datum promene adrese:", "Nije dostupan"), data["citizen_rows"])
+        self.assertIn(("Datum promene adrese:", "Nije dostupno"), data["citizen_rows"])
         self.assertIn(("Broj dokumenta:", "123456789"), data["document_rows"])
 
     def test_document_number_prefix_is_removed_only_for_expected_format(self):
