@@ -19,10 +19,20 @@
   - [Project structure](#project-structure)
   - [✨ Features](#-features)
   - [🧩 Supported Cards](#-supported-cards)
+- [DESKTOP APPLICATION (GUI)](#desktop-application-gui)
+  - [Starting the app](#starting-the-app)
+  - [Main window](#main-window)
+  - [Reader status indicator](#reader-status-indicator)
+  - [Reading a card](#reading-a-card)
+  - [Reader selection](#reader-selection)
+  - [Identity card view](#identity-card-view)
+  - [Medical card view](#medical-card-view)
+  - [Settings](#settings)
 - [CLI AND PYTHON API](#cli-and-python-api)
   - [CLI](#cli)
   - [Python API](#python-api)
 - [RUNNING CELIK-26](#running-celik-26)
+  - [Pre-built executables](#pre-built-executables)
   - [From source](#from-source)
   - [Tests](#tests)
   - [Builds and releases](#builds-and-releases)
@@ -30,6 +40,7 @@
   - [Printing](#printing)
   - [RFZO verification](#rfzo-verification)
   - [Privacy](#privacy)
+  - [Language](#language)
 - [CHANGELOG](#changelog)
   - [v0.1.3](#v013)
     - [Added](#added)
@@ -73,10 +84,19 @@ celik-26/
 |
 ├── gui/
 │   ├── settings/
+│   │   └── settings_window.py      # Preferences dialog (language, theme)
 │   ├── translations/
+│   │   ├── en.json
+│   │   └── sr.json
 │   ├── widgets/
+│   │   ├── id_card_widget.py       # Identity card view
+│   │   ├── label_row.py
+│   │   └── medical_card_widget.py  # Medical card view
 │   ├── workers/
-│   ├── app.py
+│   │   └── reader_worker.py        # Background reader/card polling thread
+│   ├── app.py                      # GUI entry point, theme setup
+│   ├── i18n.py                     # Translation lookup
+│   ├── id_card_printer.py          # A4 print preview and printing
 │   └── main_window.py
 │
 ├── core/
@@ -129,6 +149,149 @@ celik-26/
 | Serbian ID (Apollo - legacy)   | ✅ Supported       |
 | Serbian Medical Card           | ✅ Supported       |
 | Vehicle Registration Card      | ⏳ Planned         |
+
+[🔝 Back to top](#top)
+
+---
+
+## DESKTOP APPLICATION (GUI)
+
+The desktop application is the main way to use CELIK-26. It is built with
+PyQt6 and [qt-material](https://github.com/UN-GCPDS/qt-material), watches the
+connected card readers in the background, and shows card data as soon as a card
+is inserted — no button press required.
+
+### Starting the app
+
+- **Pre-built executable:** download the archive for your platform from the
+  [Releases](https://github.com/stevanzecic/celik-26/releases) page and run
+  `CELIK-26-Windows.exe`, `CELIK-26-macOS.app` or `CELIK-26-Linux`
+  (see [Pre-built executables](#pre-built-executables)).
+- **From source:**
+  ```bash
+  python3 card_reader_gui.py
+  ```
+  (see [From source](#from-source) for setting up the environment).
+
+### Main window
+
+<p align="center">
+  <img src="./assets/img/gui-main-window.png" width="80%" alt="CELIK-26 main window showing a read identity card (fictional data)">
+</p>
+
+<p align="center"><em>Main window after reading an identity card (fictional sample data).</em></p>
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Reader Selection   Settings                              │  ← menu bar
+├──────────────────────────────────────────────────────────┤
+│              Reader connected. Insert card.              │  ← status message
+│                                                          │
+│                                                          │
+│           Card view (identity / medical card)            │  ← card data
+│                                                          │
+│                                                          │
+│                              [ Save ] [ Print ] [ Read ] │  ← actions
+├──────────────────────────────────────────────────────────┤
+│ Connected to reader: <reader name>                    ●  │  ← status bar + indicator
+└──────────────────────────────────────────────────────────┘
+```
+
+| Element | Description |
+| --- | --- |
+| **Reader Selection** menu | Refresh the reader list, switch between automatic and manual reader selection |
+| **Settings → Preferences** | Change interface language and theme |
+| Status message | Current reader/card state (no reader, insert card, reading, read successfully, …) |
+| Card view | Identity-card or medical-card data; empty while no card is inserted |
+| **Read Card** | Re-read the card currently in the reader |
+| **Print** | Open the A4 print preview — enabled only after an identity card is read |
+| **Save** | Not implemented yet (always disabled) |
+| Status bar | Detailed messages, including the name of the connected reader and errors |
+
+### Reader status indicator
+
+The round indicator in the bottom-right corner of the status bar shows the
+reader state at a glance:
+
+| Indicator | Meaning |
+| :---: | --- |
+| 🔴 Red | No card reader connected |
+| 🟡 Blinking yellow | Reader connected, waiting for a card or reading it |
+| 🟢 Green | Card read successfully |
+
+### Reading a card
+
+1. Connect a PC/SC card reader. The app detects it within a couple of seconds
+   (readers are polled every 1.5 s) and the indicator turns yellow.
+2. Insert an identity or medical card. The card type is detected automatically
+   and the data is read and displayed.
+3. Remove the card — all displayed data, including the portrait, is cleared
+   immediately. Disconnecting the reader also clears the view.
+
+If a read fails, the app shows *"Failed to read card. Retrying..."* with the
+error in the status bar. Use **Read Card** to force a new read of the card
+that is already inserted.
+
+### Reader selection
+
+By default, **Reader Selection → Auto Select** is active and the first
+available reader is used. When several readers are connected:
+
+1. Open **Reader Selection → Refresh** to update the list of readers.
+2. Select a reader by name to use it exclusively (manual mode).
+3. Select **Auto Select** again to return to automatic selection.
+
+In manual mode, if the selected reader is unplugged the app waits for that
+reader to come back rather than switching to another one.
+
+### Identity card view
+
+Supports Serbian identity cards (Gemalto / Veridos and legacy Apollo) and shows:
+
+- **Portrait** read from the chip
+- **Citizen details** — surname, given name, parent's given name, date and
+  place of birth, residence and address, address change date, personal number
+  (JMBG), sex, nationality
+- **Document details** — issuing authority, document number, issue and expiry
+  dates
+- **Additional chip data** — document type and name, registration number, chip
+  serial number, address label, purpose of stay and electronic note (when
+  present on the card)
+
+The **Print** button opens an A4 print preview (with zoom and fit-to-width /
+fit-to-page controls) laid out like the official ID card reader printout; see
+[Printing](#printing).
+
+### Medical card view
+
+Shows the data stored on a Serbian health insurance (RFZO) card, grouped into:
+
+- **Insured person details** — name, date of birth, address, gender, language,
+  LBO, personal number
+- **Health insurance card details** — issue date, validity date, valid-until
+  date, permanent validity
+- **Insurance holder details** — holder's name, LBO, personal number,
+  relationship
+- **Insurance details** — insurance basis, start date, description
+- **Payer details** — name, registered office, registration number, tax ID,
+  activity
+
+The **Check validity via RFZO** button queries the public RFZO service for the
+current insurance-validity date; see [RFZO verification](#rfzo-verification).
+Printing medical cards is not implemented yet.
+
+### Settings
+
+**Settings → Preferences** opens a dialog with:
+
+| Setting | Options | Default |
+| --- | --- | --- |
+| Language | Srpski, English | Srpski |
+| Theme | Dark, Light, Automatic (currently uses Dark) | Dark |
+
+Select **Save** to apply the changes immediately. Settings are stored with
+Qt's `QSettings` (organisation `CELIK-26`, application `CardReader`) and are
+restored on the next start.
 
 [🔝 Back to top](#top)
 
@@ -205,6 +368,28 @@ card_data = card_reader_cli.auto_read_card()
 ---
 
 ## RUNNING CELIK-26
+
+### Pre-built executables
+
+Every [release](https://github.com/stevanzecic/celik-26/releases) contains
+single-file GUI builds for each platform:
+
+| Platform | Archive | Contents |
+| --- | --- | --- |
+| Windows | `CELIK-26-Windows.zip` | `CELIK-26-Windows.exe` |
+| macOS | `CELIK-26-macOS.tar.gz` | `CELIK-26-macOS.app` |
+| Linux | `CELIK-26-Linux.tar.gz` | `CELIK-26-Linux` |
+
+Extract the archive and run the application. A card reader driver and the
+system smart-card service are still required:
+
+- **Windows:** install the reader driver and make sure the **Smart Card**
+  service is running.
+- **macOS:** the built-in CryptoTokenKit smart-card support is used. The
+  builds are not signed, so on first launch right-click the app and choose
+  **Open**.
+- **Linux:** install and start `pcscd` (for example
+  `sudo apt install pcscd && sudo systemctl enable --now pcscd`).
 
 ### From source
 
@@ -308,7 +493,7 @@ Translation resources are stored in `gui/translations/sr.json` and
 `gui/translations/en.json`. They are loaded at startup without any additional
 translation toolchain.
 
-[Back to top](#top)
+[🔝 Back to top](#top)
 
 ---
 

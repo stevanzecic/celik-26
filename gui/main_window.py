@@ -27,7 +27,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("CELIK-26")
-        self.resize(900, 700)
+        self._apply_default_size()
 
         self.reader_name = None
         self.card_data = None
@@ -38,6 +38,18 @@ class MainWindow(QMainWindow):
         self._build_menu()
         self.apply_language(self.language)
         self._start_worker()
+
+    def _apply_default_size(self):
+        """Open at 4:3, tall enough to show a full ID card without scrolling."""
+        width, height = 1200, 900
+
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            width = min(width, available.width())
+            height = min(height, available.height())
+
+        self.resize(width, height)
 
     def _build_ui(self):
         central = QWidget()
